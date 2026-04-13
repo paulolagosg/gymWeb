@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import 'datatables.net-dt/css/jquery.dataTables.min.css';
+
+
+/* Estilos para DataTables con Tailwind */
+.dataTables_wrapper .dataTables_length select {
+    @apply border border-gray-300 rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    @apply border border-gray-300 rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ml-2;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    @apply px-3 py-1 border border-gray-300 rounded-md mx-1 hover:bg-gray-100;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600;
+}
+
+/* Estilos personalizados para la tabla */
+table.dataTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table.dataTable th,
+table.dataTable td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+table.dataTable th {
+    background-color: #f2f2f2;
+}
+
+table.dataTable tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+table.dataTable tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+table.dataTable tbody tr:nth-child(odd) {
+    background-color: #fff;
+}
+
+table.dataTable tbody tr td:last-child {
+    text-align: center;
+}
+
+/* Mejorar el estilo de la paginación de DataTables */
+div.dataTables_wrapper div.dataTables_paginate {
+    margin-top: 24px !important;
+    text-align: center !important;
+}
+
+div.dataTables_wrapper .dataTables_paginate .paginate_button {
+    margin: 0 8px !important;
+    padding: 8px 16px !important;
+    border-radius: 6px !important;
+    border: 1px solid #ddd !important;
+    background: #f9f9f9 !important;
+    color: #333 !important;
+    cursor: pointer !important;
+    transition: background 0.2s, color 0.2s !important;
+    min-width: 36px;
+}
+
+div.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #2563eb !important;
+    color: #fff !important;
+    border-color: #2563eb !important;
+}
+
+div.dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current) {
+    background: #e0e7ff !important;
+    color: #2563eb !important;
+}
+
+.dt-paging-button {
+    padding: 2px 8px !important;
+}
+
+.dt-length {
+    display: none !important;
+}
+
+.dt-input {
+    padding: 0 0 0 0 !important;
+}
+
+.dt-search {
+    margin-bottom: 10px;
+    ;
+}
+
+/* Estilo para la tabla responsiva */
+table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before,
+table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before {
+    background-color: #4f46e5 !important; /* Color de ícono (tailwind indigo-600) */
+    border-radius: 50% !important;
+    box-shadow: none !important;
+}
+
+/* Ajustes para móviles */
+@media screen and (max-width: 640px) {
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate {
+        float: none !important;
+        text-align: center !important;
+    }
+}
