@@ -2,10 +2,16 @@
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg ">
-                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
                     <br><small>{{$cliente->plan->nombre}}</small>
+                </div>
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
                 </a>
+                @endif
             </div>
             @if(empty($datosEjercicios))
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
@@ -28,7 +34,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <button type="button" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="window.open('{{route('clientes.evolucion_ejercicios.pdf', $cliente->slug)}}', '_blank')">Ver PDF</button>
+                    <a href="{{ route('clientes.evolucion_ejercicios.pdf', $cliente->slug) }}" target="_blank" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded inline-block">Ver PDF</a>
                 </div>
 
                 <!-- Contenido de gráficos -->
@@ -103,10 +109,11 @@
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="datosEjerciciosData" type="application/json">
+        @json($datosEjercicios)
+    </script>
     <script>
-        const datosEjercicios = {
-            !!json_encode($datosEjercicios) !!
-        };
+        const datosEjercicios = JSON.parse(document.getElementById('datosEjerciciosData').textContent);
         const chartInstances = {};
 
         function formatearFecha(fecha) {

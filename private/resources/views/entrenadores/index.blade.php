@@ -1,12 +1,27 @@
 <x-admin-layout>
+    @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-4 text-gray-900 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <a href="{{ route('usuarios.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                        Agregar Entrenador
+                    </a>
+
+                    @if($isSuperAdmin && isset($gimnasios))
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
+                    @endif
+                </div>
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
                     @if(session('success'))
                     <div class="mx-4 my-2 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
@@ -28,6 +43,8 @@
                             <tr>
                                 <th style="text-align: center;">Nombre</th>
                                 <th style="text-align: center;">Email</th>
+                                <th style="text-align: center;">Gimnasio</th>
+                                <th style="text-align: center;">Clientes activos</th>
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
                         </thead>
@@ -40,10 +57,23 @@
                                 <td>
                                     {{ $e->email }}
                                 </td>
+                                <td>
+                                    {{ $e->gimnasio->nombre ?? 'Sin gimnasio' }}
+                                </td>
+                                <td style="text-align: center;">
+                                    {{ $e->clientesActivos->count() }}
+                                </td>
                                 <td style="text-align: center;" nowrap="nowrap">
-                                    <button type="button" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="location.href='{{ route('entrenadores.opciones.portada', $e->slug) }}'">
-                                        Opciones
-                                    </button>
+                                    <a href="{{ route('usuarios.edit', $e->id) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
+                                        Editar
+                                    </a>
+                                    <form action="{{ route('usuarios.destroy', $e->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar este entrenador y sus datos asociados?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="bg-red-500 hover:bg-red-800 text-white font-bold py-1 px-2 rounded ml-2">
+                                            Eliminar
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             @endforeach

@@ -39,15 +39,21 @@
     <div class="py-12">
 
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                @if(Auth::user()->id_tipo_usuario == 1 || Auth::user()->id_clasificacion == 3)
+                @if(Auth::user()->id_tipo_usuario == 1 || Auth::user()->id_tipo_usuario == 10 || Auth::user()->id_clasificacion == 3)
                 <div class="ml-6">
-                    <form method="GET" class="mb-4 flex items-center gap-2">
+                    <form method="GET" class="mb-4 flex flex-wrap items-center gap-2">
+                        @if((int) Auth::user()->id_tipo_usuario === 10 && isset($gimnasios))
+                        <label for="id_gimnasio" class="font-semibold">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-2 py-1" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                        @endif
                         <label for="id_usuario" class="font-semibold">Filtrar por entrenador:</label>
                         <select name="id_usuario" id="id_usuario" class="border rounded px-2 py-1" onchange="this.form.submit()">
                             <option value="">Todos</option>
@@ -151,7 +157,7 @@
                     
                     <div class="footer">
                         <hr>
-                        <div>Equipo Max Fitness & Health</div>
+                        <div>Equipo Ampaya Gym</div>
                         <div>Generado automáticamente el ${new Date().toLocaleString('es-ES')}</div>
                     </div>
                     

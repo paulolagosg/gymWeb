@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AgendasEjercicios;
 use App\Models\Clientes;
+use App\Models\Gimnasios;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -18,16 +20,27 @@ class AgendasController extends Controller
     }
     public function index(Request $request)
     {
-        $usuario = auth()->user();
+        $usuario = Auth::user();
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = $idGimnasio;
         $entrenador_seleccionado = $request->input('id_usuario');
 
-        if ($usuario->id_tipo_usuario == 1 || $usuario->id_clasificacion == 3) {
-            $clientesIds = \App\Models\Clientes::where('estado', 1)->pluck('id');
+        if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || $usuario->id_clasificacion == 3) {
+            $clientesIds = \App\Models\Clientes::where('estado', 1)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->pluck('id');
             // Admin: ve todas las agendas
             $agendas = \App\Models\Agendas::with([
                 'cliente',
                 'ejercicios'
-            ]);
+            ])->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            });
             if ($entrenador_seleccionado) {
                 $agendas = $agendas->where('id_usuario', $entrenador_seleccionado);
             }
@@ -35,11 +48,17 @@ class AgendasController extends Controller
             $agendas = $agendas->get();
         } else {
             // Otros usuarios: solo agendas de sus clientes
-            $clientesIds = \App\Models\Clientes::where('id_usuario', $usuario->id)->where('estado', 1)->pluck('id');
+            $clientesIds = \App\Models\Clientes::where('id_usuario', $usuario->id)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->where('estado', 1)->pluck('id');
             $agendas = \App\Models\Agendas::with([
                 'cliente',
                 'ejercicios'
-            ])->whereIn('id_cliente', $clientesIds)->get();
+            ])->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->whereIn('id_cliente', $clientesIds)->get();
         }
 
 
@@ -121,9 +140,12 @@ class AgendasController extends Controller
             ];
         });
 
-        $entrenadores = User::where('id_tipo_usuario', 2)->get();
+        $entrenadores = User::where('id_tipo_usuario', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->get();
         $metodos = \App\Models\Metodos::where('estado', 1)->get();
-        return view('agendas.index', compact('eventos', 'entrenadores', 'entrenador_seleccionado', 'metodos'));
+        return view('agendas.index', compact('eventos', 'entrenadores', 'entrenador_seleccionado', 'metodos', 'gimnasios', 'gimnasioSeleccionado'));
     }
 
     public function create(Request $request)
@@ -132,21 +154,37 @@ class AgendasController extends Controller
         if ($request->has('reagendar')) {
             $agenda = \App\Models\Agendas::with(['cliente', 'ejercicios'])->find($request->reagendar);
         }
-        $usuario = auth()->user();
+        $usuario = Auth::user();
+        $idGimnasio = Gimnasios::gimnasioActualId();
 
-        if ($usuario->id_tipo_usuario == 1) {
-            $clientes = \App\Models\Clientes::orderBy('nombres', 'ASC')->with('plan')->get();
-            $usuarios = \App\Models\User::where('id_tipo_usuario', 2)->get(); // Obtener solo usuarios tipo 2 (entrenadores)
+        if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true)) {
+            $clientes = \App\Models\Clientes::with('plan')
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->orderBy('nombres', 'ASC')->get();
+            $usuarios = \App\Models\User::where('id_tipo_usuario', 2)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->get(); // Obtener solo usuarios tipo 2 (entrenadores)
         } else {
-            $clientes = \App\Models\Clientes::where('id_usuario', $usuario->id)->orderBy('nombres', 'ASC')->get();
-            $usuarios = \App\Models\User::where('id', $usuario->id)->get();
+            $clientes = \App\Models\Clientes::where('id_usuario', $usuario->id)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->orderBy('nombres', 'ASC')->get();
+            $usuarios = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->where('id', $usuario->id)->get();
         }
         $ejercicios = \App\Models\Ejercicios::orderBy('nombre', 'asc')->where('estado', 'b')->get(); // Obtener todos los ejercicios ordenados por nombre
         $tipos = \App\Models\TipoEjercicio::orderBy('nombre')->get();
         $metodos = \App\Models\Metodos::where('estado', 1)->get();
 
         $clientes_duos = Clientes::join('planes', 'clientes.id_plan', 'planes.id')
-            ->where('planes.tipo', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('clientes.id_gimnasio', $idGimnasio);
+            })
             ->orderBy('clientes.nombres', 'asc')
             ->select('clientes.id', 'clientes.nombres', 'clientes.paterno', 'clientes.materno')
             ->get();
@@ -175,6 +213,41 @@ class AgendasController extends Controller
             'fundamento'    => 'nullable|array',
             'descanso'    => 'required|array',
         ]);
+
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $usuarioActual = Auth::user();
+
+        $clienteValido = Clientes::where('id', $request->id_cliente)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $usuarioActual->id_tipo_usuario === 2, function ($query) use ($usuarioActual) {
+                $query->where('id_usuario', $usuarioActual->id);
+            })->exists();
+
+        $entrenadorValido = User::where('id', $request->id_usuario)
+            ->where('id_tipo_usuario', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $usuarioActual->id_tipo_usuario === 2, function ($query) use ($usuarioActual) {
+                $query->where('id', $usuarioActual->id);
+            })->exists();
+
+        if ($request->filled('id_cliente_duo')) {
+            $clienteDuoValido = Clientes::where('id', $request->id_cliente_duo)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->exists();
+
+            if (! $clienteDuoValido) {
+                return redirect()->back()->withErrors(['id_cliente_duo' => 'La dupla no pertenece al gimnasio actual.'])->withInput();
+            }
+        }
+
+        if (! $clienteValido || ! $entrenadorValido) {
+            return redirect()->back()->withErrors(['id_cliente' => 'Solo puede agendar clientes y entrenadores del gimnasio actual.'])->withInput();
+        }
 
         //$slug = $validatedData['slug'] = hash('sha256', $validated['id_cliente'] . $validated['fecha_inicio']. $fechaHoy);
 
@@ -289,6 +362,7 @@ class AgendasController extends Controller
                     'fecha_fin'    => $agendaData['fecha_fin'],
                     'id_cliente'   => $cliente_id,
                     'id_usuario'   => $request->id_usuario,
+                    'id_gimnasio'  => Gimnasios::gimnasioActualId(),
                     'slug'         => hash('sha256', $cliente_id . $fechaHoy . random_int(1, 10000)),
                 ]);
 
@@ -318,11 +392,20 @@ class AgendasController extends Controller
     }
     public function edit($slug)
     {
-        $usuarios = \App\Models\User::get(); // Obtener usuarios activos
-        $clientes = \App\Models\Clientes::where('estado', 1)->get(); // Obtener clientes activos
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $usuarios = \App\Models\User::where('id_tipo_usuario', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->get(); // Obtener usuarios activos
+        $clientes = \App\Models\Clientes::where('estado', 1)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->get(); // Obtener clientes activos
         $ejercicios = \App\Models\Ejercicios::all(); // Obtener todos los ejercicios
         $tipos = \App\Models\TipoEjercicio::orderBy('nombre')->get();
-        $agenda = \App\Models\Agendas::where('slug', $slug)->firstOrFail();
+        $agenda = \App\Models\Agendas::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $metodos = \App\Models\Metodos::where('estado', 1)->get();
 
         return view('agendas.edit', compact('agenda', 'usuarios', 'clientes', 'ejercicios', 'metodos', 'tipos'));
@@ -418,7 +501,10 @@ class AgendasController extends Controller
                 'descanso'    => 'required|array',
             ]);
 
-            $agenda = \App\Models\Agendas::where('slug', $slug)->firstOrFail();
+            $idGimnasio = Gimnasios::gimnasioActualId();
+            $agenda = \App\Models\Agendas::when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->where('slug', $slug)->firstOrFail();
 
             if ((int) $agenda->estado === 4) {
                 DB::rollBack();
@@ -455,6 +541,7 @@ class AgendasController extends Controller
             if ($modificarFuturos) {
                 // Busca todas las agendas futuras del mismo cliente, día de la semana y hora
                 $agendasFuturas = \App\Models\Agendas::where('id_cliente', $id_cliente)
+                    ->where('id_gimnasio', $agenda->id_gimnasio)
                     ->whereDate('fecha_inicio', '>', Carbon::parse($request->fecha_inicio)->format('Y-m-d'))
                     ->whereRaw('DAYOFWEEK(fecha_inicio) = ?', [$diaSemana + 1]) // MySQL: 1=domingo, 2=lunes...
                     ->whereRaw('TIME(fecha_inicio) = ?', [$horaInicio])
@@ -464,6 +551,7 @@ class AgendasController extends Controller
                 foreach ($agendasFuturas as $agendaFutura) {
                     $agendaFutura->update([
                         'id_usuario'   => $request->id_usuario,
+                        'id_gimnasio'  => $agenda->id_gimnasio,
                         'titulo'       => $request->titulo,
                         'descripcion'  => $request->descripcion,
                     ]);

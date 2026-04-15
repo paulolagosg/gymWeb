@@ -2,16 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Clientes;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SurveyController extends Controller
 {
+    private function getActiveSurvey(): Survey
+    {
+        return Survey::where('is_active', true)->first()
+            ?? Survey::create([
+                'title' => 'Encuesta de Satisfacción del Gimnasio',
+                'is_active' => true,
+            ]);
+    }
+
     public function show($slug)
     {
-        $survey = Survey::where('is_active', true)->firstOrFail();
-        $cliente = \App\Models\Clientes::where('slug', $slug)->firstOrFail();
+        $survey = $this->getActiveSurvey();
+        $cliente = Clientes::where('slug', $slug)->firstOrFail();
+
         return view('survey.show', compact('survey', 'cliente'));
     }
 
@@ -34,9 +46,11 @@ class SurveyController extends Controller
             'open_answers.additional_comments' => 'nullable|string|max:1000',
         ]);
 
+        $survey = $this->getActiveSurvey();
+
         $response = new SurveyResponse();
-        $response->user_id = auth()->id();
-        $response->survey_id = 1; //Survey::active()->first()->id;
+        $response->user_id = Auth::id();
+        $response->survey_id = $survey->id;
         $response->training_time = $validated['training_time'];
         $response->nps_score = $validated['nps_score'];
         $response->nps_reason = $validated['nps_reason'];

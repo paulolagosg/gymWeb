@@ -1,11 +1,19 @@
 <x-admin-layout>
+    @php($isAdminLike = in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true))
+    @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
-                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
-                    <br><small>{{$cliente->plan->nombre}}</small>
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                    <br><small>{{ $cliente->plan->nombre }}</small>
+                </div>
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
                 </a>
+                @endif
             </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
@@ -82,23 +90,35 @@
                                 <label for="direccion" class="block text-sm font-medium text-gray-700">Dirección</label>
                                 <input type="text" name="direccion" id="direccion" value="{{ old('direccion', $cliente->direccion) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
+                            @if($isSuperAdmin)
+                            <div class="mb-4 sm:mb-0">
+                                <label for="id_gimnasio" class="block text-sm font-medium text-gray-700">Gimnasio</label>
+                                <select name="id_gimnasio" id="id_gimnasio" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    @foreach ($gimnasios as $gimnasio)
+                                    <option value="{{ $gimnasio->id }}" {{ (string) old('id_gimnasio', $cliente->id_gimnasio) === (string) $gimnasio->id ? 'selected' : '' }}>
+                                        {{ $gimnasio->nombre }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @endif
                             <div class="mb-4 sm:mb-0">
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Plan</label>
                                 <select name="id_plan" id="id_plan" onchange="activarDuo()" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    @if(Auth::user()->id_tipo_usuario > 2) disabled @endif>
+                                    @if(!$isAdminLike) disabled @endif>
                                     <option value="">Seleccionar plan</option>
                                     @foreach ($planes as $plan)
-                                    <option data-tipo="{{$plan->tipo}}" value="{{ $plan->id }}" {{ old('id_plan') == $plan->id  ? 'selected' : '' }} {{ $cliente->id_plan == $plan->id  ? 'selected' : '' }}>
+                                    <option data-tipo="{{$plan->tipo}}" data-gimnasio="{{ $plan->id_gimnasio }}" value="{{ $plan->id }}" {{ old('id_plan') == $plan->id  ? 'selected' : '' }} {{ $cliente->id_plan == $plan->id  ? 'selected' : '' }}>
                                         {{ $plan->nombre }} - ${{ $plan->valor }}
                                     </option>
                                     @endforeach
                                 </select>
-                                @if(Auth::user()->id_tipo_usuario != 1)
+                                @if(!$isAdminLike)
                                 <input type="hidden" name="id_plan" value="{{ $cliente->id_plan }}">
                                 @endif
                             </div>
-                            <div class="mb-4 sm:mb-0" id="divDuo" style="display: {{ (old('id_plan',$cliente->id_plan) && isset($plan) && $plan->tipo == 2) ? 'block' : 'none' }};">
+                            <div class="mb-4 sm:mb-0" id="divDuo" style="display:none;">
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Dupla</label>
                                 <select name="id_cliente_duo" id="id_cliente_duo"
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -115,20 +135,20 @@
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Entrenador</label>
                                 <select name="id_usuario" id="id_usuario" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    @if(Auth::user()->id_tipo_usuario != 1) disabled @endif>
+                                    @if(!$isAdminLike) disabled @endif>
                                     <option value="">Seleccionar entrenador</option>
                                     @foreach ($usuarios as $usuario)
-                                    <option value="{{ $usuario->id }}" {{ old('id_usuario') == $usuario->id  ? 'selected' : '' }} {{ $cliente->id_usuario == $usuario->id  ? 'selected' : '' }}>
+                                    <option value="{{ $usuario->id }}" data-gimnasio="{{ $usuario->id_gimnasio }}" {{ old('id_usuario') == $usuario->id  ? 'selected' : '' }} {{ $cliente->id_usuario == $usuario->id  ? 'selected' : '' }}>
                                         {{ $usuario->name }}
                                     </option>
                                     @endforeach
                                 </select>
-                                @if(Auth::user()->id_tipo_usuario != 1)
+                                @if(!$isAdminLike)
                                 <input type="hidden" name="id_usuario" value="{{ Auth::user()->id }}">
                                 @endif
                             </div>
                             <div class="mb-4 sm:mb-0">
-                                <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">¿Cómo llegó a Max?</label>
+                                <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">¿Cómo llegó al gimnasio?</label>
                                 <select name="id_motivo_ingreso" id="id_motivo_ingreso" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                     <option value="">Seleccionar motivo</option>
@@ -147,14 +167,27 @@
                                     class="w-full mt-1 block border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
+                                <label for="id_tipo_usuario" class="block text-sm font-medium text-gray-700">Tipo Cliente</label>
+                                <select name="id_tipo_usuario" id="id_tipo_usuario" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" @if(!$isAdminLike) disabled @endif>
+                                    @foreach ($tipos_usuarios as $tu)
+                                    <option value="{{ $tu->id }}" {{ (string) old('id_tipo_usuario', optional($cliente->user)->id_tipo_usuario) === (string) $tu->id ? 'selected' : '' }}>
+                                        {{ $tu->nombre }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                                @if(!$isAdminLike)
+                                <input type="hidden" name="id_tipo_usuario" value="{{ optional($cliente->user)->id_tipo_usuario }}">
+                                @endif
+                            </div>
+                            <div class="mb-4 sm:mb-0">
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Estado</label>
                                 <select name="estado" id="estado"
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    @if(Auth::user()->id_tipo_usuario != 1) disabled @endif>
+                                    @if(!$isAdminLike) disabled @endif>
                                     <option value="1" {{ old('estado') == '1' ? 'selected' : '' }} {{ $cliente->estado == 'Activo' ? 'selected' : '' }}>Activo</option>
                                     <option value="0" {{ old('estado') == '0' ? 'selected' : '' }} {{ $cliente->estado == 'Inactivo' ? 'selected' : '' }}>Inactivo</option>
                                 </select>
-                                @if(Auth::user()->id_tipo_usuario != 1)
+                                @if(!$isAdminLike)
                                 <input type="hidden" name="estado" value="{{ $cliente->estado =='Activo' ? '1' : '0' }}">
                                 @endif
                             </div>
@@ -181,9 +214,15 @@
                             <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
                                 Guardar Cambios
                             </button>
-                            <button type="button" onclick="location.href='{{ route('clientes.opciones.portada', $cliente->slug) }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                            @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                            <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-block bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                                Volver
+                            </a>
+                            @else
+                            <a href="{{ route('clientes.agenda', $cliente->slug) }}" class="inline-block bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
                                 Cancelar
-                            </button>
+                            </a>
+                            @endif
                         </div>
                     </form>
                 </div>
@@ -225,16 +264,45 @@
         }
 
         var planSelect = document.getElementById('id_plan');
-        var duoSelect = document.getElementById('id_usuario');
-        var selectedOption = planSelect.options[planSelect.selectedIndex];
-        var tipo = selectedOption.getAttribute('data-tipo');
-        var usuario_duo = document.getElementById('id_cliente_duo');
-        var divDuo = document.getElementById('divDuo');
-        if (tipo == 2) {
-            divDuo.style.display = 'block';
+        var gimnasioSelect = document.getElementById('id_gimnasio');
+
+        function filtrarOpcionesPorGimnasio() {
+            if (!gimnasioSelect) {
+                activarDuo();
+                return;
+            }
+
+            var gimnasioId = gimnasioSelect.value;
+            ['id_plan', 'id_usuario'].forEach(function(selectId) {
+                var select = document.getElementById(selectId);
+                if (!select) return;
+
+                Array.from(select.options).forEach(function(option, index) {
+                    if (index === 0) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    var optionGym = option.getAttribute('data-gimnasio') || '';
+                    var visible = gimnasioId !== '' && optionGym === gimnasioId;
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+                });
+
+                if (select.selectedIndex > 0 && select.options[select.selectedIndex] && select.options[select.selectedIndex].disabled) {
+                    select.value = '';
+                }
+            });
+
+            activarDuo();
+        }
+
+        if (gimnasioSelect) {
+            gimnasioSelect.addEventListener('change', filtrarOpcionesPorGimnasio);
+            filtrarOpcionesPorGimnasio();
         } else {
-            divDuo.style.display = 'none';
-            usuario_duo.value = '';
+            activarDuo();
         }
     });
 
@@ -298,9 +366,8 @@
 
     function activarDuo() {
         var planSelect = document.getElementById('id_plan');
-        var duoSelect = document.getElementById('id_usuario');
         var selectedOption = planSelect.options[planSelect.selectedIndex];
-        var tipo = selectedOption.getAttribute('data-tipo');
+        var tipo = selectedOption ? selectedOption.getAttribute('data-tipo') : null;
         var usuario_duo = document.getElementById('id_cliente_duo');
         var divDuo = document.getElementById('divDuo');
         if (tipo == 2) {

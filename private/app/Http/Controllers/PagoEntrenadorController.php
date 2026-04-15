@@ -4,26 +4,46 @@ namespace App\Http\Controllers;
 
 use App\Models\PagoEntrenador;
 use App\Models\HistorialTarifaEntrenador;
+use App\Models\Gimnasios;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class PagoEntrenadorController extends Controller
 {
+    private function abortUnlessAdmin(): void
+    {
+        if ((int) optional(Auth::user())->id_tipo_usuario !== 1) {
+            abort(403, 'No tiene acceso');
+        }
+    }
+
     public function index(Request $request)
     {
+        $this->abortUnlessAdmin();
         $month = $request->input('month', Carbon::now()->month);
         $year  = $request->input('year', Carbon::now()->year);
+        $idGimnasio = Gimnasios::gimnasioActualId();
 
-        $entrenadores = User::where('id_tipo_usuario', 2)->orderBy('name')->get();
+        $entrenadores = User::where('id_tipo_usuario', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $entrenadorIds = $entrenadores->pluck('id');
 
         $registros = PagoEntrenador::where('year', $year)
             ->where('month', $month)
+            ->whereIn('entrenador_id', $entrenadorIds)
             ->get()
             ->keyBy('entrenador_id');
 
         $tarifas = HistorialTarifaEntrenador::where('year', $year)
             ->where('month', $month)
+            ->whereIn('entrenador_id', $entrenadorIds)
             ->get()
             ->keyBy('entrenador_id');
 
@@ -32,6 +52,8 @@ class PagoEntrenadorController extends Controller
 
     public function store(Request $request)
     {
+        $this->abortUnlessAdmin();
+
         $data = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year'  => 'required|integer|min:2000|max:2100',
@@ -43,9 +65,18 @@ class PagoEntrenadorController extends Controller
             'entrenadores.*.descuento' => 'nullable|numeric|min:0',
         ]);
 
+        $idGimnasio = Gimnasios::gimnasioActualId();
+
         foreach ($data['entrenadores'] as $item) {
-            $entrenador = User::find($item['id']);
-            if (!$entrenador) continue;
+            $entrenador = User::where('id', $item['id'])
+                ->where('id_tipo_usuario', 2)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->first();
+
+            if (! $entrenador) {
+                abort(403, 'No tiene acceso');
+            }
 
             $ses_ind = intval($item['sesiones_individual'] ?? 0);
             $ses_duo = intval($item['sesiones_duo'] ?? 0);
@@ -95,6 +126,8 @@ class PagoEntrenadorController extends Controller
 
     public function destroy($id)
     {
+        $this->abortUnlessAdmin();
+
         PagoEntrenador::findOrFail($id)->delete();
         return back()->with('success', 'Registro eliminado');
     }

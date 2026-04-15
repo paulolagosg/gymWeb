@@ -1,0 +1,97 @@
+<x-admin-layout>
+    <div class="py-4">
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6 text-gray-900">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-4">
+                    Editar gimnasio
+                </h2>
+
+                <form action="{{ route('gimnasios.update', $gimnasio->slug) }}" method="POST">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="nombre" class="block text-gray-700">Nombre</label>
+                            <input type="text" id="nombre" name="nombre" value="{{ old('nombre', $gimnasio->nombre) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                            @error('nombre') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="direccion" class="block text-gray-700">Dirección</label>
+                            <input type="text" id="direccion" name="direccion" value="{{ old('direccion', $gimnasio->direccion) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('direccion') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="telefono" class="block text-gray-700">Teléfono</label>
+                            <input type="text" id="telefono" name="telefono" value="{{ old('telefono', $gimnasio->telefono) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('telefono') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="correo_electronico" class="block text-gray-700">Correo electrónico</label>
+                            <input type="email" id="correo_electronico" name="correo_electronico" value="{{ old('correo_electronico', $gimnasio->correo_electronico) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('correo_electronico') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="sitio_web" class="block text-gray-700">Sitio web</label>
+                            <input type="url" id="sitio_web" name="sitio_web" value="{{ old('sitio_web', $gimnasio->sitio_web) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('sitio_web') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="estado" class="block text-gray-700">Estado</label>
+                            @if(Auth::user()->id_tipo_usuario == 1)
+                            <select id="estado" name="estado" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                                <option value="1" {{ old('estado', $gimnasio->estado) == '1' ? 'selected' : '' }}>Activo</option>
+                                <option value="0" {{ old('estado', $gimnasio->estado) == '0' ? 'selected' : '' }}>Inactivo</option>
+                            </select>
+                            @else
+                            <input type="hidden" name="estado" value="{{ old('estado', $gimnasio->estado) }}">
+                            <div class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-700">
+                                {{ $gimnasio->estado == 1 ? 'Activo' : 'Inactivo' }}
+                            </div>
+                            @endif
+                            @error('estado') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="instagram" class="block text-gray-700">Instagram</label>
+                            <input type="text" id="instagram" name="instagram" value="{{ old('instagram', $gimnasio->instagram) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('instagram') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="facebook" class="block text-gray-700">Facebook</label>
+                            <input type="text" id="facebook" name="facebook" value="{{ old('facebook', $gimnasio->facebook) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('facebook') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="tiktok" class="block text-gray-700">TikTok</label>
+                            <input type="text" id="tiktok" name="tiktok" value="{{ old('tiktok', $gimnasio->tiktok) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('tiktok') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="descripcion" class="block text-gray-700">Descripción</label>
+                            <textarea id="descripcion" name="descripcion" rows="4" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">{{ old('descripcion', $gimnasio->descripcion) }}</textarea>
+                            @error('descripcion') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
+                            Guardar cambios
+                        </button>
+                        <button type="button" onclick="location.href='{{ route('gimnasios.index') }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</x-admin-layout>

@@ -1,22 +1,41 @@
 @php
-$panelTone = !empty($mobile) ? 'bg-stone-900 border-stone-700/80' : 'bg-white/5 border-white/10';
-$sectionTone = !empty($mobile) ? 'text-stone-400' : 'text-stone-500';
-$linkTone = !empty($mobile) ? 'text-stone-200 hover:bg-stone-800 hover:text-white' : 'text-stone-300 hover:bg-black hover:text-white';
-$iconTone = !empty($mobile) ? 'bg-stone-800 text-stone-300 group-hover:bg-stone-700 group-hover:text-white' : 'bg-white/5 text-stone-400 group-hover:bg-white/10 group-hover:text-white';
-$profileTone = !empty($mobile) ? 'text-stone-200 hover:bg-stone-800 hover:text-white' : 'text-stone-300 hover:bg-white/8 hover:text-white';
-$contentWrapperTone = !empty($mobile) ? 'flex-1 px-4 py-5' : 'min-h-0 flex-1 overflow-y-auto px-4 py-5';
+$panelTone = !empty($mobile) ? 'bg-stone-50 border-stone-200' : 'bg-stone-50 border-stone-200';
+$sectionTone = 'text-stone-500';
+$linkTone = 'text-stone-700 hover:!bg-black hover:!text-white';
+$iconTone = 'bg-stone-100 text-stone-500';
+$profileTone = 'text-stone-700 hover:!bg-black hover:!text-white';
+$isProfileActive = request()->routeIs('profile.*');
+$contentWrapperTone = !empty($mobile) ? 'px-4 py-5 pb-24' : 'min-h-0 flex-1 overflow-y-auto px-4 py-5';
 @endphp
 
-<div class="border-b border-white/10 px-5 py-5">
+<style>
+    .sidebar-nav-link:hover,
+    .sidebar-nav-link.is-active,
+    .sidebar-profile-link:hover,
+    .sidebar-profile-link.is-active {
+        background: #000 !important;
+        color: #fff !important;
+    }
+
+    .sidebar-nav-link:hover .sidebar-nav-icon,
+    .sidebar-nav-link.is-active .sidebar-nav-icon,
+    .sidebar-profile-link:hover .sidebar-nav-icon,
+    .sidebar-profile-link.is-active .sidebar-nav-icon {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: #fff !important;
+    }
+</style>
+
+<div class="shrink-0 border-b border-white/10 px-5 py-5">
     <div class="flex items-center justify-between gap-3">
-        <a href="{{ route('portada') }}" class="flex items-center gap-3">
-            <span class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
+        <a href="{{ $homeRoute ?? route('portada') }}" class="flex items-center gap-3">
+            <span class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white/10 ring-white/10">
                 <x-application-logo class="block h-10 w-10 rounded-xl object-cover" />
             </span>
         </a>
 
         @if (!empty($mobile))
-        <button type="button" onclick="window.adminSidebar && window.adminSidebar.close()" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-stone-300 transition hover:bg-white/10 hover:text-white md:hidden">
+        <button type="button" onclick="window.adminSidebar && window.adminSidebar.close()" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 md:hidden">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
         @endif
@@ -47,10 +66,10 @@ $contentWrapperTone = !empty($mobile) ? 'flex-1 px-4 py-5' : 'min-h-0 flex-1 ove
             $isActive = request()->routeIs(...$item['patterns']);
             @endphp
 
-            <a href="{{ route($item['route']) }}"
-                class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition {{ $isActive ? 'bg-amber-300 text-stone-950 shadow-lg shadow-amber-500/20' : $linkTone }}"
+            <a href="{{ route($item['route'], $item['params'] ?? []) }}"
+                class="sidebar-nav-link group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition {{ $isActive ? 'is-active bg-black text-white shadow-lg shadow-stone-950/20' : $linkTone }}"
                 @if (!empty($mobile)) onclick="window.adminSidebar && window.adminSidebar.close()" @endif>
-                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl {{ $isActive ? 'bg-stone-950/10 text-stone-950' : $iconTone }}">
+                <span class="sidebar-nav-icon inline-flex h-10 w-10 items-center justify-center rounded-xl {{ $isActive ? 'bg-white/15 text-white' : $iconTone }}">
                     <i class="fa-solid {{ $item['icon'] }}"></i>
                 </span>
                 <span class="truncate">{{ $item['label'] }}</span>
@@ -62,9 +81,9 @@ $contentWrapperTone = !empty($mobile) ? 'flex-1 px-4 py-5' : 'min-h-0 flex-1 ove
     @endforeach
 </div>
 
-<div class="border-t border-white/10 p-4">
-    <a href="{{ route('profile.edit') }}" class="mb-2 flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition {{ $profileTone }}">
-        <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-stone-400">
+<div class="shrink-0 border-t border-white/10 p-4">
+    <a href="{{ route('profile.edit') }}" class="sidebar-profile-link group mb-2 flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition {{ $isProfileActive ? 'is-active bg-black text-white shadow-lg shadow-stone-950/20' : $profileTone }}">
+        <span class="sidebar-nav-icon inline-flex h-10 w-10 items-center justify-center rounded-xl {{ $isProfileActive ? 'bg-white/15 text-white' : 'bg-stone-100 text-stone-500' }}">
             <i class="fa-solid fa-user"></i>
         </span>
         <span>Mi perfil</span>
@@ -72,8 +91,8 @@ $contentWrapperTone = !empty($mobile) ? 'flex-1 px-4 py-5' : 'min-h-0 flex-1 ove
 
     <form method="POST" action="{{ route('logout') }}">
         @csrf
-        <button type="submit" class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-rose-200 transition hover:bg-rose-500/10 hover:text-rose-100">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-300">
+        <button type="submit" class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 hover:text-rose-700">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-500">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </span>
             <span>Cerrar sesion</span>

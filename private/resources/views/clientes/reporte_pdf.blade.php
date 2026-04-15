@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Reporte de Indicadores</title>
@@ -43,13 +44,15 @@
             margin-bottom: 20px;
         }
 
-        th, td {
+        th,
+        td {
             border: 1px solid #ccc;
             padding: 4px;
             font-size: 11px;
         }
 
-        h2, h3 {
+        h2,
+        h3 {
             margin-top: 20px;
             page-break-after: avoid;
         }
@@ -87,27 +90,28 @@
         }
     </style>
 </head>
+
 <body>
     <header>
-        <img src="https://static.wixstatic.com/media/6d10e7_ec01ef38f649435295345bd8aa178ff9~mv2.png/v1/fill/w_169,h_89,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Logo%20MAX%202023.png" 
-             alt="Logo" 
-             style="max-width: 180px; margin-bottom: 16px;">
+        <img src="https://static.wixstatic.com/media/6d10e7_ec01ef38f649435295345bd8aa178ff9~mv2.png/v1/fill/w_169,h_89,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Logo%20MAX%202023.png"
+            alt="Logo"
+            style="max-width: 180px; margin-bottom: 16px;">
     </header>
 
     <footer>
-        Equipo Max Fitness & Health
+        Equipo Ampaya Gym
     </footer>
 
     <main>
         <h2>Reporte de {{ $cliente->nombres }} {{$cliente->paterno }} {{$cliente->materno }}</h2>
-        
+
         {{-- Peso --}}
         <div class="section">
             <h3>Evolución del Peso</h3>
             <div class="chart-container">
-                <img src="{{ $chartPesoUrl }}" 
-                     alt="Gráfico de Peso" 
-                     class="chart-img">
+                <img src="{{ $chartPesoUrl }}"
+                    alt="Gráfico de Peso"
+                    class="chart-img">
             </div>
             <table>
                 <thead>
@@ -131,9 +135,9 @@
         <div class="section">
             <h3>Evolución del IMC</h3>
             <div class="chart-container">
-                <img src="{{ $chartimcsUrl }}" 
-                     alt="Gráfico de IMC" 
-                     class="chart-img">
+                <img src="{{ $chartimcsUrl }}"
+                    alt="Gráfico de IMC"
+                    class="chart-img">
             </div>
             <table>
                 <thead>
@@ -157,9 +161,9 @@
         <div class="section">
             <h3>Evolución del % de Grasa Corporal</h3>
             <div class="chart-container">
-                <img src="{{ $chartGrasaUrl }}" 
-                     alt="Gráfico de % de Grasa Corporal" 
-                     class="chart-img">
+                <img src="{{ $chartGrasaUrl }}"
+                    alt="Gráfico de % de Grasa Corporal"
+                    class="chart-img">
             </div>
             <table>
                 <thead>
@@ -183,9 +187,9 @@
         <div class="section">
             <h3>Evolución del % de Masa Ósea</h3>
             <div class="chart-container">
-                <img src="{{ $chartGrasaUrl }}" 
-                     alt="Gráfico de % de masa Ósea" 
-                     class="chart-img">
+                <img src="{{ $chartGrasaUrl }}"
+                    alt="Gráfico de % de masa Ósea"
+                    class="chart-img">
             </div>
             <table>
                 <thead>
@@ -208,9 +212,9 @@
         <div class="section">
             <h3>Evolución del % de Masa Muscular</h3>
             <div class="chart-container">
-                <img src="{{ $chartPmuscularUrl }}" 
-                     alt="Gráfico de % de masa muscular" 
-                     class="chart-img">
+                <img src="{{ $chartPmuscularUrl }}"
+                    alt="Gráfico de % de masa muscular"
+                    class="chart-img">
             </div>
             <table>
                 <thead>
@@ -235,9 +239,9 @@
         <div class="section">
             <h3>Evolución de los Perímetros</h3>
             <div class="chart-container">
-                <img src="{{ $chartPerimetrosUrl }}" 
-                     alt="Gráfico de Perímetros" 
-                     class="chart-img">
+                <img src="{{ $chartPerimetrosUrl }}"
+                    alt="Gráfico de Perímetros"
+                    class="chart-img">
             </div>
             <table class="table-perimetros">
                 <thead>
@@ -359,4 +363,5 @@
     </script>
     @endif
 </body>
+
 </html>

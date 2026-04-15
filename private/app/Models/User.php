@@ -32,7 +32,8 @@ class User extends Authenticatable
         'slug',
         'individual',
         'duo',
-        'titulo'
+        'titulo',
+        'id_gimnasio'
     ];
 
     /**
@@ -72,6 +73,11 @@ class User extends Authenticatable
     public function cliente()
     {
         return $this->belongsTo(Clientes::class, 'id_cliente');
+    }
+
+    public function gimnasio()
+    {
+        return $this->belongsTo(Gimnasios::class, 'id_gimnasio');
     }
     public function clasificacion()
     {

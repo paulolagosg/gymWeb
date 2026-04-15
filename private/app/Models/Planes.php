@@ -15,7 +15,8 @@ class Planes extends Model
         'valor',
         'porcentaje',
         'slug',
-        'estado'
+        'estado',
+        'id_gimnasio'
     ];
     protected $casts = [
         'valor' => 'integer',
@@ -54,5 +55,10 @@ class Planes extends Model
     public function scopeInactivos($query)
     {
         return $query->where('estado', 0);
+    }
+
+    public function gimnasio()
+    {
+        return $this->belongsTo(Gimnasios::class, 'id_gimnasio');
     }
 }

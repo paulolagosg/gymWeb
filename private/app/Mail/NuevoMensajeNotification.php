@@ -21,7 +21,7 @@ class NuevoMensajeNotification extends Mailable
 
     public function build()
     {
-        return $this->subject('Tienes un nuevo mensaje en el Max Fitness & Health')
+        return $this->subject('Tienes un nuevo mensaje en Ampaya Gym')
             ->markdown('emails.nuevo_mensaje');
     }
 }

@@ -1,11 +1,6 @@
 <x-admin-layout>
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('dashboard') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
                     @if(session('success'))

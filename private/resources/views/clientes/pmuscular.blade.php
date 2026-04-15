@@ -1,10 +1,17 @@
 <x-admin-layout>
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg text-center">
-                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                    <br><small>{{ $cliente->plan->nombre ?? 'Sin plan' }}</small>
+                </div>
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
                 </a>
+                @endif
             </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
@@ -26,7 +33,7 @@
                     <h2 class="text-lg font-semibold">% de Masa Muscular</h2>
                     <div class="mt-4">
                         <p><strong>Fecha de Registro:</strong> {{ $pmuscularReciente->created_at->format('d/m/Y') }}</p>
-                        <p><strong>Actual:</strong> {{ $pmuscularReciente->imc }} </p>
+                        <p><strong>Actual:</strong> {{ $pmuscularReciente->valor }} </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                         <!-- Gráfico de evolución del peso -->
@@ -69,9 +76,7 @@
                             <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
                                 Registrar % Masa Muscular
                             </button>
-                            <button type="button" onclick="location.href='{{ route('clientes.opciones.portada', $cliente->slug) }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
-                                Cancelar
-                            </button>
+
 
                         </div>
                     </form>
@@ -81,14 +86,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="graficoPmuscularData" type="application/json">
+        @json($pmuscularChartData)
+    </script>
     <script>
         const ctx = document.getElementById('graficoPmuscular').getContext('2d');
-        const labels = {
-            !!json_encode($pmuscular - > sortBy('created_at') - > pluck('created_at') - > map(fn($d) => \Carbon\ Carbon::parse($d) - > format('d/m/Y'))) !!
-        };
-        const data = {
-            !!json_encode($pmuscular - > sortBy('created_at') - > pluck('valor')) !!
-        };
+        const pmuscularChartData = JSON.parse(document.getElementById('graficoPmuscularData').textContent);
+        const labels = pmuscularChartData.labels ?? [];
+        const data = pmuscularChartData.values ?? [];
 
         new Chart(ctx, {
             type: 'line',

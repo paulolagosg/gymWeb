@@ -7,6 +7,7 @@ use App\Http\Controllers\MensajeController;
 use App\Http\Controllers\MovimientosFinancierosController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EvaluacionInicialController;
+use App\Http\Controllers\GimnasiosController;
 use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,6 +38,14 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/planes/{slug}', [\App\Http\Controllers\PlanesController::class, 'update'])->name('planes.update');
     Route::delete('/planes/{slug}', [\App\Http\Controllers\PlanesController::class, 'destroy'])->name('planes.destroy');
     Route::patch('/planes/{slug}/estado', [\App\Http\Controllers\PlanesController::class, 'toggleStatus'])->name('planes.cambiarEstado');
+    /* gimnasios */
+    Route::get('/gimnasios', [GimnasiosController::class, 'index'])->name('gimnasios.index');
+    Route::get('/gimnasios/create', [GimnasiosController::class, 'create'])->name('gimnasios.create');
+    Route::post('/gimnasios', [GimnasiosController::class, 'store'])->name('gimnasios.store');
+    Route::get('/gimnasios/{slug}/edit', [GimnasiosController::class, 'edit'])->name('gimnasios.edit');
+    Route::put('/gimnasios/{slug}', [GimnasiosController::class, 'update'])->name('gimnasios.update');
+    Route::delete('/gimnasios/{slug}', [GimnasiosController::class, 'destroy'])->name('gimnasios.destroy');
+    Route::patch('/gimnasios/{slug}/estado', [GimnasiosController::class, 'toggleStatus'])->name('gimnasios.cambiarEstado');
     /* usuarios */
     Route::get('/usuarios', [\App\Http\Controllers\UsuariosController::class, 'index'])->name('usuarios.index');
     Route::get('/usuarios/create', [\App\Http\Controllers\UsuariosController::class, 'create'])->name('usuarios.create');

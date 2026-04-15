@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes — MAX Fitness & Health (Mobile)
+| API Routes — Ampaya Gym (Mobile)
 |--------------------------------------------------------------------------
 |
 | Rutas consumidas por la app móvil React Native.

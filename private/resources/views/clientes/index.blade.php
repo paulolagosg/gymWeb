@@ -1,17 +1,28 @@
 <x-admin-layout>
+    @php($esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
+    @php($puedeGestionarClientes = in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true) || (int) Auth::user()->id_clasificacion === 3)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                @if(Auth::user()->id_tipo_usuario == 1 || Auth::user()->id_clasificacion == 3)
-                <div class="p-4 text-gray-900 items-center flex justify-between text-end">
-                    <a href="{{ route('clientes.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                @if($puedeGestionarClientes)
+                <div class="p-4 text-gray-900 items-center flex flex-col gap-3 md:flex-row md:justify-between text-end">
+                    <a href="{{ route('clientes.create', $esSuperAdmin && !empty($gimnasioSeleccionado) ? ['id_gimnasio' => $gimnasioSeleccionado] : []) }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                         Agregar Cliente
                     </a>
+
+                    @if($esSuperAdmin && isset($gimnasios))
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
+                    @endif
                 </div>
                 @endif
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
@@ -41,6 +52,9 @@
                                 <th style="text-align: center;">Fin</th>
                                 <th style="text-align: center;">Tipo</th>
                                 <th style="text-align: center;">Entrenador</th>
+                                @if($esSuperAdmin)
+                                <th style="text-align: center;">Gimnasio</th>
+                                @endif
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
                         </thead>
@@ -58,15 +72,34 @@
                                 <td>{{ \Carbon\Carbon::parse($cliente->fecha_fin)->format('d/m/Y') }}</td>
                                 <td>{{ $cliente->tipo_usuario ?? '-' }}</td>
                                 <td>{{$cliente->entrenador->name ?? '-' }}</td>
+                                @if($esSuperAdmin)
+                                <td>{{ $cliente->gimnasio->nombre ?? 'Sin gimnasio' }}</td>
+                                @endif
                                 <td style="text-align: center;" nowrap="nowrap">
                                     @if($clientesMorosos->contains('id', $cliente->id))
                                     <button type="button" id="btnRecordatorio{{ $cliente->slug }}" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="enviarRecrdatorioPago('{{ $cliente->slug }}')">
                                         Enviar recordatorio pago
                                     </button>
                                     @endif
-                                    <button type="button" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="location.href='{{ route('clientes.opciones.portada', $cliente->slug) }}'">
+
+                                    @if(!$esSuperAdmin)
+                                    <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
                                         Opciones
-                                    </button>
+                                    </a>
+                                    @else
+                                    <a href="{{ route('clientes.edit', $cliente->slug) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
+                                        Editar
+                                    </a>
+                                    @if($puedeGestionarClientes)
+                                    <form action="{{ route('clientes.destroy', $cliente->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar este cliente y sus datos asociados?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="bg-red-500 hover:bg-red-800 text-white font-bold py-1 px-2 rounded ml-2">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                    @endif
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach

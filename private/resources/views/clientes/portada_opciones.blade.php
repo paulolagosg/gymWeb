@@ -9,15 +9,15 @@
     <div class="py-4">
         <div class="max-w-7xl mx-auto">
             <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
-                @if(Auth::user()->id_tipo_usuario <= 2)
-                    <a href="{{ route('clientes.index') }}" class="text-gray-700 hover:text-gray-500">
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.index') }}" class="text-gray-700 hover:text-gray-500">
                     <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
                     <br><small>{{$cliente->plan->nombre}}</small>
-                    </a>
-                    @else
-                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
-                    <br><small>{{$cliente->plan->nombre}}</small>
-                    @endif
+                </a>
+                @else
+                <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                <br><small>{{$cliente->plan->nombre}}</small>
+                @endif
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
                 <a href="{{ route('clientes.edit',$cliente->slug) }}" class="hover:text-gray-500">

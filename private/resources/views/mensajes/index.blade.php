@@ -1,19 +1,45 @@
 <x-admin-layout>
+    @php($clienteActual = auth()->user()?->cliente)
+    @php($isSuperAdmin = (int) auth()->user()->id_tipo_usuario === 10)
+    @php($isAdminLike = in_array((int) auth()->user()->id_tipo_usuario, [1, 10], true) || (int) auth()->user()->id_clasificacion === 3)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
+            @if($clienteActual)
+            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $clienteActual->nombres }} {{ $clienteActual->paterno }} {{ $clienteActual->materno }}</i>
+                    <br><small>{{ $clienteActual->plan->nombre ?? 'Sin plan' }}</small>
+                </div>
             </div>
+            @endif
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4">
-                <h2 class="text-2xl font-bold mb-4">Bandeja de entrada</h2>
+                @if($isSuperAdmin && isset($gimnasios))
+                <div class="mb-4 flex justify-end">
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
+                </div>
+                @endif
                 <!-- Modal y tabla dentro de un mismo x-data -->
                 <div x-data="{ show: false, mensajeId: null }">
                     <table class="min-w-full divide-y divide-gray-200 tabla_datos">
                         <thead>
                             <tr>
                                 <th class="px-4 py-2 text-left">De</th>
+                                @if($isAdminLike)
+                                <th class="px-4 py-2 text-left">Para</th>
+                                @endif
+                                @if($isSuperAdmin)
+                                <th class="px-4 py-2 text-left">Gimnasio</th>
+                                @endif
                                 <th class="px-4 py-2 text-left">Fecha</th>
                                 <th class="px-4 py-2 text-left">Acciones</th>
                             </tr>
@@ -22,6 +48,12 @@
                             @foreach($mensajes as $mensaje)
                             <tr class="border-b">
                                 <td class="px-4 py-2">{{ $mensaje->remitente->name }}</td>
+                                @if($isAdminLike)
+                                <td class="px-4 py-2">{{ $mensaje->destinatario->name ?? '-' }}</td>
+                                @endif
+                                @if($isSuperAdmin)
+                                <td class="px-4 py-2">{{ $mensaje->remitente->gimnasio->nombre ?? 'Sin gimnasio' }}</td>
+                                @endif
                                 <td class="px-4 py-2">{{ $mensaje->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="px-4 py-2">
                                     <button type="button"

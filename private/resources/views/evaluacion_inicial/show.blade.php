@@ -3,14 +3,11 @@
         <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
             <div class="bg-white rounded-lg shadow-sm p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500 inline-flex items-center gap-2 mb-3">
-                        <i class="fas fa-circle-left"></i>
-                        Volver a opciones del cliente
-                    </a>
                     <h1 class="text-2xl font-bold text-gray-900">Evaluación inicial de {{ $cliente->nombres }} {{ $cliente->paterno }}</h1>
+                    <p class="text-sm text-gray-500 mt-1">{{ $cliente->plan->nombre ?? 'Sin plan' }}</p>
                     <p class="text-sm text-gray-500 mt-1">Vista de solo lectura para seguimiento del proceso inicial.</p>
                 </div>
-                <div class="text-sm">
+                <div class="ml-auto flex flex-col items-end gap-3 text-sm">
                     @if($evaluacion?->completada_en)
                     <div class="inline-flex items-center rounded-full bg-green-100 px-4 py-2 font-semibold text-green-700">
                         Completada el {{ $evaluacion->completada_en->format('d-m-Y H:i') }}
@@ -19,6 +16,12 @@
                     <div class="inline-flex items-center rounded-full bg-red-100 px-4 py-2 font-semibold text-red-700">
                         Pendiente de completar
                     </div>
+                    @endif
+                    @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                    <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                        <i class="fas fa-arrow-left"></i>
+                        Volver
+                    </a>
                     @endif
                 </div>
             </div>

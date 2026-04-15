@@ -1,11 +1,6 @@
 <x-admin-layout>
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4">
                 <h2 class="text-2xl font-bold mb-4">Cartola
                 </h2>

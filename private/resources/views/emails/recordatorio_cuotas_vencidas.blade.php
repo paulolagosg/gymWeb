@@ -19,5 +19,5 @@ Si ya has realizado el pago, por favor ignora este mensaje. Si tienes alguna dud
 @endcomponent
 
 Saludos cordiales,<br>
-**Equipo Max Fitness & Health**
+**Equipo Ampaya Gym**
 @endcomponent

@@ -12,7 +12,7 @@
                     <h2 class="text-xl font-bold mb-4">Encuesta de Satisfacción</h2>
                     <form method="POST" action="{{ route('encuestas.store', $entrenador->slug) }}">
                         @csrf
-                        <p class="mb-2">En <b><i>Max Fitness & Health</i></b> siempre queremos mejorar tu experiencia.<br>
+                        <p class="mb-2">En <b><i>Ampaya Gym</i></b> siempre queremos mejorar tu experiencia.<br>
                             Es por esto que por favor te pedimos que evalúes a tu entrenador <b>{{ $entrenador->name }}</b> en una escala de 1 al 5, en donde 1 = Muy insatisfecho, 5 = Muy satisfecho.</p>
                         <div class="mb-4">
                             <label>1.1. Profesionalismo y conocimiento técnico</label><br>

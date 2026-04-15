@@ -35,7 +35,8 @@ class Clientes extends Model
         'otro_ingreso',
         'otro_egreso',
         'perfil',
-        'id_cliente_duo'
+        'id_cliente_duo',
+        'id_gimnasio'
     ];
     protected $casts = [
         'fecha_nacimiento' => 'date',
@@ -103,6 +104,11 @@ class Clientes extends Model
     public function plan()
     {
         return $this->belongsTo(Planes::class, 'id_plan');
+    }
+
+    public function gimnasio()
+    {
+        return $this->belongsTo(Gimnasios::class, 'id_gimnasio');
     }
 
     public function user()

@@ -22,10 +22,17 @@
 <x-admin-layout>
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg text-center">
-                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                    <br><small>{{ $cliente->plan->nombre ?? 'Sin plan' }}</small>
+                </div>
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
                 </a>
+                @endif
             </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
@@ -352,59 +359,59 @@
                         <tbody>
                             <tr>
                                 <td>Alergias, enfermedades patológicas conocidas</td>
-                                <td style="align:left">{{ $fitPlan->patologias }}</td>
+                                <td style="text-align:left">{{ $fitPlan->patologias }}</td>
                             </tr>
                             <tr>
                                 <td>Intolerancias Alimentarias</td>
-                                <td style="align:left">{{ $fitPlan->intolerancias }}</td>
+                                <td style="text-align:left">{{ $fitPlan->intolerancias }}</td>
                             </tr>
                             <tr>
                                 <td>Alimentos que NO te gustan</td>
-                                <td style="align:left">{{ $fitPlan->no_gustan }}</td>
+                                <td style="text-align:left">{{ $fitPlan->no_gustan }}</td>
                             </tr>
                             <tr>
                                 <td>Alimentos que ENCANTAN</td>
-                                <td style="align:left">{{ $fitPlan->encantan }}</td>
+                                <td style="text-align:left">{{ $fitPlan->encantan }}</td>
                             </tr>
                             <tr>
                                 <td>Horario de comidas</td>
-                                <td style="align:left">{{ $fitPlan->horario }}</td>
+                                <td style="text-align:left">{{ $fitPlan->horario }}</td>
                             </tr>
                             <tr>
                                 <td>Hora a la que te sueles levantar</td>
-                                <td style="align:left">{{ $fitPlan->hora_levantarse }}</td>
+                                <td style="text-align:left">{{ $fitPlan->hora_levantarse }}</td>
                             </tr>
                             <tr>
                                 <td>Hora a la que te sueles acostar</td>
-                                <td style="align:left">{{ $fitPlan->hora_acostarse }}</td>
+                                <td style="text-align:left">{{ $fitPlan->hora_acostarse }}</td>
                             </tr>
                             <tr>
                                 <td>Descripción de tu trabajo</td>
-                                <td style="align:left">{{ $fitPlan->trabajo }}</td>
+                                <td style="text-align:left">{{ $fitPlan->trabajo }}</td>
                             </tr>
                             <tr>
                                 <td>Horario en que vas al gimnasio</td>
-                                <td style="align:left">{{ $fitPlan->hora_gimnasio }}</td>
+                                <td style="text-align:left">{{ $fitPlan->hora_gimnasio }}</td>
                             </tr>
                             <tr>
                                 <td>Duración del entreno</td>
-                                <td style="align:left">{{ $fitPlan->duracion_entreno }}</td>
+                                <td style="text-align:left">{{ $fitPlan->duracion_entreno }}</td>
                             </tr>
                             <tr>
                                 <td>Suplementación Actual (sólo si aplica)</td>
-                                <td style="align:left">{{ $fitPlan->suplemento }}</td>
+                                <td style="text-align:left">{{ $fitPlan->suplemento }}</td>
                             </tr>
                             <tr>
                                 <td>Descríbeme lo que sueles comer actualmente un día cualquiera</td>
-                                <td style="align:left">{{ $fitPlan->dia_cualquiera }}</td>
+                                <td style="text-align:left">{{ $fitPlan->dia_cualquiera }}</td>
                             </tr>
                             <tr>
                                 <td>Datos que puedas creer que son de intereses relacionados con tu preparación</td>
-                                <td style="align:left">{{ $fitPlan->datos_interes }}</td>
+                                <td style="text-align:left">{{ $fitPlan->datos_interes }}</td>
                             </tr>
                             <tr>
                                 <td>Objetivo del acondicionamiento físico</td>
-                                <td style="align:left">{{ $fitPlan->objetivo }}</td>
+                                <td style="text-align:left">{{ $fitPlan->objetivo }}</td>
                             </tr>
                         </tbody>
                         @endif
@@ -421,19 +428,19 @@
 
     {{-- Chart.js --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="reporteChartData" type="application/json">
+        @json($reportChartData)
+    </script>
     <script>
+        const reportChartData = JSON.parse(document.getElementById('reporteChartData').textContent);
         const ctx = document.getElementById('graficoPeso').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($pesos - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.pesosLabels ?? [],
                 datasets: [{
                     label: 'Peso (kg)',
-                    data: {
-                        !!json_encode($pesos - > pluck('peso')) !!
-                    },
+                    data: reportChartData.pesosData ?? [],
                     borderColor: 'rgba(59,130,246,1)',
                     backgroundColor: 'rgba(59,130,246,0.2)',
                     fill: false,
@@ -463,14 +470,10 @@
         new Chart(ctx2, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($imcs - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.imcsLabels ?? [],
                 datasets: [{
                     label: 'IMC',
-                    data: {
-                        !!json_encode($imcs - > pluck('imc')) !!
-                    },
+                    data: reportChartData.imcsData ?? [],
                     borderColor: 'green',
                     backgroundColor: 'rgba(59,130,246,0.2)',
                     fill: false,
@@ -531,14 +534,10 @@
         new Chart(ctgrasa, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($grasas - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.grasasLabels ?? [],
                 datasets: [{
                     label: '% de Grasa Corporal',
-                    data: {
-                        !!json_encode($grasas - > pluck('valor')) !!
-                    },
+                    data: reportChartData.grasasData ?? [],
                     borderColor: 'green',
                     backgroundColor: 'rgba(59,130,246,0.2)',
                     fill: false,
@@ -567,14 +566,10 @@
         new Chart(cposea, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($posea - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.poseaLabels ?? [],
                 datasets: [{
                     label: '% de Masa Ósea',
-                    data: {
-                        !!json_encode($posea - > pluck('valor')) !!
-                    },
+                    data: reportChartData.poseaData ?? [],
                     borderColor: 'green',
                     backgroundColor: 'rgba(59,130,246,0.2)',
                     fill: false,
@@ -604,14 +599,10 @@
         new Chart(cpmuscular, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($pmuscular - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.pmuscularLabels ?? [],
                 datasets: [{
                     label: '% de Masa Muscular',
-                    data: {
-                        !!json_encode($pmuscular - > pluck('valor')) !!
-                    },
+                    data: reportChartData.pmuscularData ?? [],
                     borderColor: 'green',
                     backgroundColor: 'rgba(59,130,246,0.2)',
                     fill: false,
@@ -681,9 +672,7 @@
 
         // Perímetros
         const ctperimetros = document.getElementById('graficoPerimetros').getContext('2d');
-        const perimetrosData = {
-            !!json_encode($perimetros) !!
-        };
+        const perimetrosData = reportChartData.perimetros ?? [];
 
         // Definir etiquetas para cada perímetro
         const perimetrosConfig = [{
@@ -766,9 +755,7 @@
         new Chart(ctperimetros, {
             type: 'line',
             data: {
-                labels: {
-                    !!json_encode($perimetros - > pluck('created_at') - > map(fn($d) => $d - > format('d/m/Y'))) !!
-                },
+                labels: reportChartData.perimetrosLabels ?? [],
                 datasets: filteredDatasets
             },
             options: {

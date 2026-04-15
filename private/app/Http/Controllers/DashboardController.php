@@ -4,16 +4,81 @@ namespace App\Http\Controllers;
 
 use App\Models\Clientes;
 use App\Models\CuentasCorrientes;
+use App\Models\Gimnasios;
 use App\Models\Motivos;
 use App\Models\PagoEntrenador;
 use App\Models\SurveyResponse;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    public function portada(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user && in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
+            return redirect()->route('dashboard');
+        }
+
+        if ($user && in_array((int) $user->id_tipo_usuario, [3, 4], true)) {
+            $cliente = $user->cliente ?? Clientes::find($user->id_cliente);
+
+            if ($cliente && $cliente->slug) {
+                return redirect()->route('clientes.agenda', $cliente->slug);
+            }
+
+            return redirect()->route('clientes.portada');
+        }
+
+        $slug = $user && (int) $user->id_tipo_usuario === 2 ? $user->slug : null;
+
+        return view('portada', compact('slug'));
+    }
+
+    public function panel(Request $request)
+    {
+        return $this->portada($request);
+    }
+
+    private function formatYearMonthSql(string $column): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
+    }
+
+    private function formatMonthSql(string $column): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "strftime('%m', {$column})"
+            : "DATE_FORMAT({$column}, '%m')";
+    }
+
+    private function formatYearMonthFromPartsSql(string $yearColumn, string $monthColumn): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "printf('%04d-%02d', {$yearColumn}, {$monthColumn})"
+            : "DATE_FORMAT(CONCAT({$yearColumn}, '-', LPAD({$monthColumn}, 2, '0'), '-01'), '%Y-%m')";
+    }
+
+    private function hourSql(string $column): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "CAST(strftime('%H', {$column}) AS INTEGER)"
+            : "HOUR({$column})";
+    }
+
+    private function ageYearsSql(string $column): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "CAST((julianday('now') - julianday({$column})) / 365.25 AS INTEGER)"
+            : "TIMESTAMPDIFF(YEAR, {$column}, CURDATE())";
+    }
+
     public function index(Request $request)
     {
 
@@ -38,17 +103,27 @@ class DashboardController extends Controller
         for ($m = 1; $m <= 12; $m++) {
             $meses[] = $mesesNombres[sprintf('%02d', $m)];
         }
-        $user = auth()->user();
+        $user = Auth::user();
+        $esSuperAdmin = (int) $user->id_tipo_usuario === 10;
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasioSeleccionado = $idGimnasio;
         DB::enableQueryLog();
         // Obtener ingresos mensuales
-        if ($user->id_tipo_usuario == 1) {
+        if (in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             // Para admin: ingresos desde cuentas_corrientes
             $ingresosQuery = CuentasCorrientes::select(
-                DB::raw("DATE_FORMAT(fecha_vencimiento, '%Y-%m') as mes"),
+                DB::raw($this->formatYearMonthSql('fecha_vencimiento') . ' as mes'),
                 DB::raw("SUM(monto_pagado) as total")
             )
-                ->whereYear('fecha_pago', $añoSeleccionado)
-                ->whereNotNull('fecha_pago');
+                ->join('clientes', 'clientes.id', '=', 'cuentas_corrientes.id_cliente')
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('clientes.id_gimnasio', $idGimnasio);
+                })
+                ->whereYear('cuentas_corrientes.fecha_pago', $añoSeleccionado)
+                ->whereNotNull('cuentas_corrientes.fecha_pago');
 
             $ingresosDB = $ingresosQuery
                 ->groupBy('mes')
@@ -59,7 +134,7 @@ class DashboardController extends Controller
         } else {
             // Para entrenadores: ingresos desde pagos_entrenadores
             $ingresosDB = \App\Models\PagoEntrenador::select(
-                DB::raw("DATE_FORMAT(DATE_FORMAT(CONCAT(year, '-', LPAD(month, 2, '0'), '-01'), '%Y-%m-%d'), '%Y-%m') as mes"),
+                DB::raw($this->formatYearMonthFromPartsSql('year', 'month') . ' as mes'),
                 DB::raw("SUM(total) as total")
             )
                 ->where('entrenador_id', $user->id)
@@ -99,11 +174,15 @@ class DashboardController extends Controller
         // // Consultar los montos pagados agrupados por forma de pago y mes
         $pagosPorForma = \App\Models\CuentasCorrientes::select(
             'id_forma_pago',
-            DB::raw("DATE_FORMAT(fecha_pago, '%Y-%m') as mes"),
+            DB::raw($this->formatYearMonthSql('cuentas_corrientes.fecha_pago') . ' as mes'),
             DB::raw("SUM(monto_pagado) as total")
         )
-            ->whereYear('fecha_pago', $añoSeleccionado)
-            ->whereNotNull('fecha_pago')
+            ->join('clientes', 'clientes.id', '=', 'cuentas_corrientes.id_cliente')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('clientes.id_gimnasio', $idGimnasio);
+            })
+            ->whereYear('cuentas_corrientes.fecha_pago', $añoSeleccionado)
+            ->whereNotNull('cuentas_corrientes.fecha_pago')
             ->groupBy('id_forma_pago', 'mes')
             ->get();
 
@@ -127,8 +206,13 @@ class DashboardController extends Controller
 
         $mesActual = Carbon::now()->format('Y-m');
         $im = [];
-        if ($user->id_tipo_usuario == 1) {
-            $clientes = Clientes::with(['cuotas', 'plan'])->where('estado', 1)->get();
+        if (in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
+            $clientes = Clientes::with(['cuotas', 'plan'])
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->where('estado', 1)
+                ->get();
             // $im = collect(DB::select('call ObtenerTotalesMensuales(?)', [$añoSeleccionado]))
             //     ->map(function ($item) {
             //         return (array)$item;
@@ -137,6 +221,9 @@ class DashboardController extends Controller
         } else {
             $clientes = Clientes::with(['cuotas', 'plan'])
                 ->where('id_usuario', $user->id)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
                 ->where('estado', 1)
                 ->get();
             // $im = collect(DB::select('CALL GenerarReporteRentaConAcumuladoAnual(?, ?)', [$añoSeleccionado, $user->id]))
@@ -211,7 +298,10 @@ class DashboardController extends Controller
 
         $picosHorarios = [];
         foreach ($horarios as $nombre => [$inicio, $fin]) {
-            $picosHorarios[$nombre] = \App\Models\Agendas::whereBetween(DB::raw('HOUR(fecha_inicio)'), [$inicio, $fin - 1])
+            $picosHorarios[$nombre] = \App\Models\Agendas::whereBetween(DB::raw($this->hourSql('fecha_inicio')), [$inicio, $fin - 1])
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
                 ->whereYear('fecha_inicio', $añoSeleccionado)
                 ->count();
         }
@@ -244,22 +334,22 @@ class DashboardController extends Controller
         $clientesPorEdad = [];
         foreach ($rangos as $label => [$min, $max]) {
             $clientesPorEdad[$label] = Clientes::whereIn('id', $clientesIds)
-                ->whereBetween(DB::raw('TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())'), [$min, $max])
+                ->whereBetween(DB::raw($this->ageYearsSql('fecha_nacimiento')), [$min, $max])
                 ->count();
         }
         DB::enableQueryLog();
         // Obtener ingresos proyectados por mes
         $proyectadosQuery = CuentasCorrientes::select(
-            DB::raw("DATE_FORMAT(fecha_vencimiento, '%Y-%m') as mes"),
+            DB::raw($this->formatYearMonthSql('fecha_vencimiento') . ' as mes'),
             DB::raw("SUM(monto_pagar) as total")
         )
             ->whereYear('fecha_vencimiento', $añoSeleccionado);
 
 
-        if ($user->id_tipo_usuario != 1) {
+        if (! in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             $porcentaje = $user->porcentaje ?? 0;
             $proyectadosQuery = CuentasCorrientes::select(
-                DB::raw("DATE_FORMAT(fecha_vencimiento, '%Y-%m') as mes"),
+                DB::raw($this->formatYearMonthSql('fecha_vencimiento') . ' as mes'),
                 DB::raw("SUM(monto_pagar * (" . $porcentaje . "/100)) as total")
             )
                 ->whereYear('fecha_vencimiento', $añoSeleccionado);
@@ -311,35 +401,36 @@ class DashboardController extends Controller
             ];
         }
 
-        $retencionData = $this->calcularTasaRetencionMensual($añoSeleccionado);
-
-        $mesesRetencion = $retencionData->pluck('mes')->unique()->sort()->values();
-        $entrenadoresRetencion = $retencionData->groupBy('entrenador');
-
-        $datasetsRetencion = [];
-        foreach ($entrenadoresRetencion as $nombre => $datos) {
-            $tasas = [];
-            foreach ($mesesRetencion as $mes) {
-                $registro = $datos->firstWhere('mes', $mes);
-                $tasas[] = $registro ? $registro->tasa_retencion : 0;
-            }
-
-            $datasetsRetencion[] = [
+        $reporte = [];
+        $surveyData = [];
+        $npsData = [];
+        $wordCloudData = [];
+        $motivos = [];
+        $motivosIngreso = collect();
+        $motivosEgreso = collect();
+        $servqualAverages = [];
+        $servqualSummary = [];
+        $servqualLabelNames = [];
+        $servqualValueNames = [];
+        $topWords = [];
+        $ingresosMesesChart = collect($ingresosMensuales)->pluck('mes')->values()->all();
+        $ingresosTotalesChart = collect($ingresosMensuales)->pluck('total')->values()->all();
+        $ingresosProyectadosChart = collect($ingresosProyectados)->pluck('total')->values()->all();
+        $formasPagoNombresChart = array_keys($formasPagoMensual);
+        $formasPagoDatasetsChart = collect($formasPagoMensual)->map(function ($valores, $nombre) {
+            return [
                 'label' => $nombre,
-                'data' => $tasas,
-                'borderColor' => 'rgba(' . rand(0, 255) . ',' . rand(0, 255) . ',' . rand(0, 255) . ', 1)',
-                'backgroundColor' => 'rgba(' . rand(0, 255) . ',' . rand(0, 255) . ',' . rand(0, 255) . ', 0.2)',
+                'data' => array_values($valores),
+                'borderWidth' => 2,
                 'fill' => false,
-                'tension' => 0.1
             ];
-        }
-
-        $reporte = $this->generarReporteNuevosBajas($añoSeleccionado);
-
-        $surveyData = $this->getSurveyData($añoSeleccionado);
-        $npsData = $this->getNpsData($añoSeleccionado);
-        $wordCloudData = $this->getWordCloudData($añoSeleccionado);
-        $motivos = $this->getMotivosData($añoSeleccionado);
+        })->values()->all();
+        $picosLabelsChart = array_keys($picosHorarios);
+        $picosDataChart = array_values($picosHorarios);
+        $nombrePlanLabelsChart = $clientesPorNombrePlan->keys()->values()->all();
+        $nombrePlanDataChart = $clientesPorNombrePlan->values()->values()->all();
+        $mesesClientesChart = $mesesClientes->values()->all();
+        $datasetsClientesPorEntrenadorChart = $datasetsClientesPorEntrenador;
 
         return view('dashboard', [
             'totalClientes' => $totalClientes,
@@ -358,27 +449,49 @@ class DashboardController extends Controller
             'clientesPorEntrenador' => $clientesPorEntrenador,
             'mesesClientes' => $mesesClientes,
             'datasetsClientesPorEntrenador' => $datasetsClientesPorEntrenador,
-            'retencionData' => $retencionData,
-            'mesesRetencion' => $mesesRetencion,
-            'datasetsRetencion' => $datasetsRetencion,
             'reporte' => $reporte,
             'surveyData' => $surveyData,
             'npsData' => $npsData,
             'wordCloudData' => $wordCloudData,
             'motivos' => $motivos,
+            'motivosIngreso' => $motivosIngreso,
+            'motivosEgreso' => $motivosEgreso,
+            'servqualAverages' => $servqualAverages,
+            'servqualSummary' => $servqualSummary,
+            'servqualLabelNames' => $servqualLabelNames,
+            'servqualValueNames' => $servqualValueNames,
+            'topWords' => $topWords,
+            'ingresosMesesChart' => $ingresosMesesChart,
+            'ingresosTotalesChart' => $ingresosTotalesChart,
+            'ingresosProyectadosChart' => $ingresosProyectadosChart,
+            'formasPagoNombresChart' => $formasPagoNombresChart,
+            'formasPagoDatasetsChart' => $formasPagoDatasetsChart,
+            'picosLabelsChart' => $picosLabelsChart,
+            'picosDataChart' => $picosDataChart,
+            'nombrePlanLabelsChart' => $nombrePlanLabelsChart,
+            'nombrePlanDataChart' => $nombrePlanDataChart,
+            'mesesClientesChart' => $mesesClientesChart,
+            'datasetsClientesPorEntrenadorChart' => $datasetsClientesPorEntrenadorChart,
             'formasPago' => $formasPago,
             'formasPagoMensual' => $formasPagoMensual,
+            'gimnasios' => $gimnasios,
+            'gimnasioSeleccionado' => $gimnasioSeleccionado,
+            'esSuperAdmin' => $esSuperAdmin,
         ]);
     }
 
     public function getDashboardData(Request $request)
     {
         $añoSeleccionado = $request->input('anio', Carbon::now()->year);
-        $user = auth()->user();
+        $user = Auth::user();
+        $idGimnasio = Gimnasios::gimnasioActualId();
 
         // Datos para tarjetas
-        $clientesQuery = Clientes::query();
-        if ($user->id_tipo_usuario != 1) {
+        $clientesQuery = Clientes::query()
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            });
+        if (! in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             $clientesQuery->where('id_usuario', $user->id);
         }
         $clientes = $clientesQuery->where('estado', 1)->get();
@@ -399,13 +512,13 @@ class DashboardController extends Controller
 
         // Ingresos mensuales
         $ingresosQuery = CuentasCorrientes::select(
-            DB::raw("DATE_FORMAT(fecha_pago, '%m') as mes"),
+            DB::raw($this->formatMonthSql('fecha_pago') . ' as mes'),
             DB::raw("SUM(monto_pagado) as total")
         )
             ->whereYear('fecha_pago', $añoSeleccionado)
             ->whereNotNull('fecha_pago');
 
-        if ($user->id_tipo_usuario != 1) {
+        if (! in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             $clientesIds = $clientes->pluck('id');
             $ingresosQuery->whereIn('id_cliente', $clientesIds);
         }
@@ -426,21 +539,23 @@ class DashboardController extends Controller
 
     private function obtenerClientesAcumuladosPorAnio($anio)
     {
-        $user = auth()->user();
-        $query = "
-        SELECT
-            CONCAT(year, '-', LPAD(month, 2, '0'), '-01') AS fecha_inicio,
-            SUM(total) AS total_acumulado
-        FROM
-            pagos_entrenadores
-        WHERE
-            year = $anio
-        GROUP BY
-            year, month
-        ";
-        $resultados = DB::select($query);
+        $idGimnasio = Gimnasios::gimnasioActualId();
 
-        return collect($resultados);
+        return PagoEntrenador::query()
+            ->join('users', 'users.id', '=', 'pagos_entrenadores.entrenador_id')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('users.id_gimnasio', $idGimnasio);
+            })
+            ->where('pagos_entrenadores.year', $anio)
+            ->select(
+                'users.name as entrenador',
+                DB::raw($this->formatYearMonthFromPartsSql('pagos_entrenadores.year', 'pagos_entrenadores.month') . ' as mes'),
+                DB::raw('SUM(total) as total_acumulado')
+            )
+            ->groupBy('users.name', 'pagos_entrenadores.year', 'pagos_entrenadores.month')
+            ->orderBy('pagos_entrenadores.year')
+            ->orderBy('pagos_entrenadores.month')
+            ->get();
     }
 
     function obtenerTasaRetencionMensualPorEntrenador($anio)
@@ -449,10 +564,19 @@ class DashboardController extends Controller
             return Carbon::create($anio, $mes, 1)->format('Y-m');
         });
 
+        $idGimnasio = Gimnasios::gimnasioActualId();
+
         $entrenadores = DB::table('users')
             ->where('id_tipo_usuario', 2)
-            ->whereIn('id', function ($query) {
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->whereIn('id', function ($query) use ($idGimnasio) {
                 $query->select('id_usuario')->from('clientes');
+
+                if ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                }
             })
             ->pluck('name', 'id');
 
@@ -467,6 +591,9 @@ class DashboardController extends Controller
                 // Clientes activos al final de este mes
                 $activosFin = DB::table('clientes')
                     ->where('id_usuario', $id_entrenador)
+                    ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                        $query->where('id_gimnasio', $idGimnasio);
+                    })
                     ->where('estado', 1)
                     ->where('fecha_ingreso', '<=', $finMes)
                     ->where(function ($q) use ($finMes) {

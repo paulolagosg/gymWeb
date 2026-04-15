@@ -19,5 +19,5 @@ Te informamos que hemos registrado el pago de tu cuota correspondiente al mes de
 @endcomponent
 
 Saludos cordiales,<br>
-**Equipo Max Fitness & Health**
+**Equipo Ampaya Gym**
 @endcomponent

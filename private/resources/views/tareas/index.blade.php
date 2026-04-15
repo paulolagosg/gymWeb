@@ -1,27 +1,30 @@
 <x-admin-layout>
+    @php($isAdminLike = in_array((int) auth()->user()->id_tipo_usuario, [1, 10], true) || (int) auth()->user()->id_clasificacion === 3)
+    @php($isSuperAdmin = (int) auth()->user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                @if(auth()->user()->id_clasificacion == 3 or auth()->user()->id_tipo_usuario == 1)
-                <a href="{{ route('entrenadores.index') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-                @else
-                <a href="{{ route('portada') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-                @endif
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-4 text-gray-900 items-center flex justify-between text-end">
-                    @if(auth()->user()->id_clasificacion == 3)
-                    <a href="{{ route('tareas.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                @if($isAdminLike)
+                <div class="p-4 text-gray-900 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <a href="{{ route('tareas.create', $isSuperAdmin && !empty($gimnasioSeleccionado) ? ['id_gimnasio' => $gimnasioSeleccionado] : []) }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                         Agregar Tarea
                     </a>
-                    @else
-                    <h2 class="text-2xl font-bold p-4">Tareas</h2>
+
+                    @if($isSuperAdmin && isset($gimnasios))
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
                     @endif
                 </div>
+                @endif
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
                     @if(session('success'))
                     <div class="mx-4 my-2 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
@@ -41,8 +44,11 @@
                     <table id="tablaDatos" class="display ">
                         <thead>
                             <tr>
-                                @if(auth()->user()->id_clasificacion == 3)
+                                @if($isAdminLike)
                                 <th style="text-align: center;">Entrenador</th>
+                                @endif
+                                @if($isSuperAdmin)
+                                <th style="text-align: center;">Gimnasio</th>
                                 @endif
                                 <th style="text-align: center;">Tarea</th>
                                 <th style="text-align: center;">Fecha Límite</th>
@@ -53,20 +59,23 @@
                         <tbody>
                             @foreach($tareas as $tarea)
                             <tr>
-                                @if(auth()->user()->id_clasificacion == 3)
-                                <td>{{ $tarea->usuario->name }}</td>
+                                @if($isAdminLike)
+                                <td>{{ $tarea->entrenador_nombre ?? $tarea->usuario->name ?? '-' }}</td>
+                                @endif
+                                @if($isSuperAdmin)
+                                <td>{{ $tarea->gimnasio_nombre ?? '-' }}</td>
                                 @endif
                                 <td>{{ $tarea->nombre }}</td>
                                 <td>{{ $tarea->fecha_limite }}</td>
                                 <td>{{ $tarea->completada }}</td>
                                 <td>
-                                    <button class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded" onclick="window.location.href='{{ route('tareas.show', $tarea->slug) }}'">
+                                    <a href="{{ route('tareas.show', $tarea->slug) }}" class="inline-block bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                                         Ver
-                                    </button>
-                                    @if(auth()->user()->id_clasificacion == 3)
-                                    <button class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded" onclick="window.location.href='{{ route('tareas.edit', $tarea->slug) }}'">
+                                    </a>
+                                    @if($isAdminLike)
+                                    <a href="{{ route('tareas.edit', $tarea->slug) }}" class="inline-block bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                                         Editar
-                                    </button>
+                                    </a>
                                     <form action="{{ route('tareas.destroy', $tarea->slug) }}" method="POST" style="display:inline;">
                                         @csrf
                                         @method('DELETE')

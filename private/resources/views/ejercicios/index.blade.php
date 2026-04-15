@@ -1,11 +1,6 @@
 <x-admin-layout>
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-4 text-gray-900 flex justify-between text-end">
                     <a href="{{ route('ejercicios.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
@@ -32,7 +27,7 @@
                         <thead>
                             <tr>
                                 <th colspan="2" style="text-align: center;">Nombre</th>
-                                <th style="text-align: center;">Descripción</th>
+                                <!-- <th style="text-align: center;">Descripción</th> -->
                                 <th style="text-align: center;">Estado</th>
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
@@ -42,7 +37,7 @@
                             <tr>
                                 <td><img src="/iconos/{{ $ejercicio->tipo->icono }}" style="width:32px" /></td>
                                 <td> {{ $ejercicio->nombre }}</td>
-                                <td>{{ $ejercicio->descripcion }}</td>
+                                <!-- <td>{{ $ejercicio->descripcion }}</td> -->
                                 <td>@if($ejercicio->estado == 1) Activo @else Inactivo @endif</td>
                                 <td style="text-align: center;">
                                     <button class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="location.href='{{ route('ejercicios.edit', $ejercicio->slug) }}'">

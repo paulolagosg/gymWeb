@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Gimnasios;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -15,11 +16,25 @@ use Illuminate\Support\Facades\Artisan;
 
 class MovimientosFinancierosController extends Controller
 {
+    private function abortUnlessAdmin(): void
+    {
+        if (!Auth::check() || (int) Auth::user()->id_tipo_usuario !== 1) {
+            abort(403, 'No tiene acceso');
+        }
+    }
 
     public function index()
     {
-        //$this->authorize('viewCaja'); // Puedes usar un policy o simplemente un if en la vista
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $authUser = Auth::user();
         $movimientos1 = MovimientosFinancieros::orderBy('fecha', 'desc')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $authUser->id_tipo_usuario === 2, function ($query) use ($authUser) {
+                $query->where('user_id', $authUser->id);
+            })
             ->select('fecha', 'descripcion', 'tipo', 'monto');
 
         $cuentas = CuentasCorrientes::join('clientes', 'clientes.id', 'cuentas_corrientes.id_cliente')
@@ -30,6 +45,12 @@ class MovimientosFinancierosController extends Controller
                 DB::raw("sum(cuentas_corrientes.monto_pagado) as monto")
             )
             ->whereNotNull('cuentas_corrientes.fecha_pago')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('clientes.id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $authUser->id_tipo_usuario === 2, function ($query) use ($authUser) {
+                $query->where('clientes.id_usuario', $authUser->id);
+            })
             ->groupBy('cuentas_corrientes.fecha_pago', 'clientes.nombres', 'clientes.paterno')
             ->orderBy('cuentas_corrientes.fecha_pago', 'desc');
         DB::enableQueryLog();
@@ -44,13 +65,13 @@ class MovimientosFinancierosController extends Controller
 
     public function create()
     {
-        //$this->authorize('viewCaja');
+        $this->abortUnlessAdmin();
         return view('movimientos.create');
     }
 
     public function store(Request $request)
     {
-        //$this->authorize('viewCaja');
+        $this->abortUnlessAdmin();
         $request->validate([
             'fecha' => 'required|date',
             'descripcion' => 'required|string',
@@ -63,23 +84,32 @@ class MovimientosFinancierosController extends Controller
             'tipo' => $request->tipo,
             'monto' => $request->monto,
             'user_id' => Auth::id(),
+            'id_gimnasio' => Gimnasios::gimnasioActualId(),
         ]);
         return redirect()->route('caja.index')->with('success', 'Movimiento registrado');
     }
 
     public function exportExcel()
     {
-        //$this->authorize('viewCaja');
+        $this->abortUnlessAdmin();
         $fecha_actual = now()->format('Ymd_His');
         return Excel::download(new MovimientosExport, 'cartola_' . $fecha_actual . '.xlsx');
     }
 
     public function exportPdf()
     {
-        //$this->authorize('viewCaja');
+        $this->abortUnlessAdmin();
         $fecha_actual = now()->format('Ymd_His');
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $authUser = Auth::user();
 
         $movimientos1 = MovimientosFinancieros::orderBy('fecha', 'desc')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $authUser->id_tipo_usuario === 2, function ($query) use ($authUser) {
+                $query->where('user_id', $authUser->id);
+            })
             ->select('fecha', 'descripcion', 'tipo', 'monto');
 
         $cuentas = CuentasCorrientes::join('clientes', 'clientes.id', 'cuentas_corrientes.id_cliente')
@@ -90,6 +120,12 @@ class MovimientosFinancierosController extends Controller
                 DB::raw("sum(cuentas_corrientes.monto_pagado) as monto")
             )
             ->whereNotNull('cuentas_corrientes.fecha_pago')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('clientes.id_gimnasio', $idGimnasio);
+            })
+            ->when((int) $authUser->id_tipo_usuario === 2, function ($query) use ($authUser) {
+                $query->where('clientes.id_usuario', $authUser->id);
+            })
             ->groupBy('cuentas_corrientes.fecha_pago', 'clientes.nombres', 'clientes.paterno')
             ->orderBy('cuentas_corrientes.fecha_pago', 'desc');
         DB::enableQueryLog();

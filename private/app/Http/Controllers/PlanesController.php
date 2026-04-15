@@ -2,92 +2,171 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Gimnasios;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PlanesController extends Controller
 {
-    public function index()
+    private function abortUnlessAdmin(): void
     {
-        if (auth()->user()->id_tipo_usuario != 1) {
-            abort(403);
-        } else {
-            $planes = \App\Models\Planes::all(); // Obtener todos los planes
-            return view('planes.index', compact('planes'));
+        if (!Auth::check() || !in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true)) {
+            abort(403, 'No tiene acceso');
         }
     }
+
+    public function index(Request $request)
+    {
+        $this->abortUnlessAdmin();
+
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = $idGimnasio;
+
+        $planes = \App\Models\Planes::with('gimnasio')->when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->get();
+
+        return view('planes.index', compact('planes', 'gimnasios', 'gimnasioSeleccionado'));
+    }
+
     public function create()
     {
-        if (auth()->user()->id_tipo_usuario != 1) {
-            abort(403);
-        } else {
-            return view('planes.create');
-        }
+        $this->abortUnlessAdmin();
+
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = (int) request()->input('id_gimnasio', Gimnasios::gimnasioActualId());
+
+        return view('planes.create', compact('gimnasios', 'gimnasioSeleccionado'));
     }
+
     public function store(Request $request)
     {
-        // Validación y almacenamiento del plan
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+
         $validatedData = $request->validate([
-            'nombre' => 'required|string|max:255|unique:planes',
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('planes', 'nombre')->where(function ($query) use ($idGimnasio) {
+                    if ($idGimnasio) {
+                        $query->where('id_gimnasio', $idGimnasio);
+                    }
+
+                    return $query;
+                }),
+            ],
             'descripcion' => 'nullable|string|max:500',
             'valor' => 'required|integer|min:0',
-            'porcentaje' => 'nullable|integer|min:0|max:100', // Validación para el porcentaje
+            'porcentaje' => 'nullable|integer|min:0|max:100',
             'estado' => 'required|integer',
+            'id_gimnasio' => ($esSuperAdmin ? 'required' : 'nullable') . '|exists:gimnasios,id',
         ]);
 
-        // Generar el slug automáticamente
         $validatedData['slug'] = Str::slug($validatedData['nombre']);
+        $validatedData['id_gimnasio'] = $esSuperAdmin
+            ? (int) $validatedData['id_gimnasio']
+            : Gimnasios::gimnasioActualId();
 
-        // Guardar el plan en la base de datos
         \App\Models\Planes::create($validatedData);
 
         return redirect()->route('planes.index')->with('success', 'Plan creado exitosamente.');
     }
+
     public function edit($slug)
     {
-        $plan = \App\Models\Planes::where('slug', $slug)->firstOrFail();
-        return view('planes.edit', compact('plan'));
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $plan = \App\Models\Planes::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+
+        return view('planes.edit', compact('plan', 'gimnasios'));
     }
+
     public function update(Request $request, $slug)
     {
-        $plan = \App\Models\Planes::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $plan = \App\Models\Planes::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
 
-        // Validación y actualización del plan
         $validatedData = $request->validate([
-            'nombre' => 'required|string|max:255|unique:planes,nombre,' . $plan->id,
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('planes', 'nombre')
+                    ->ignore($plan->id)
+                    ->where(function ($query) use ($idGimnasio) {
+                        if ($idGimnasio) {
+                            $query->where('id_gimnasio', $idGimnasio);
+                        }
+
+                        return $query;
+                    }),
+            ],
             'descripcion' => 'nullable|string|max:500',
             'valor' => 'required|integer|min:0',
-            'porcentaje' => 'nullable|integer|min:0|max:100', // Validación para el porcentaje
+            'porcentaje' => 'nullable|integer|min:0|max:100',
             'estado' => 'required|integer',
+            'id_gimnasio' => 'nullable|exists:gimnasios,id',
         ]);
 
-        // Generar el slug automáticamente
-        $validatedData['slug'] = \Illuminate\Support\Str::slug($validatedData['nombre']);
+        $validatedData['slug'] = Str::slug($validatedData['nombre']);
+        $validatedData['id_gimnasio'] = $esSuperAdmin
+            ? (int) ($validatedData['id_gimnasio'] ?? $plan->id_gimnasio)
+            : ($plan->id_gimnasio ?: Gimnasios::gimnasioActualId());
 
-        // Actualizar el plan en la base de datos
         $plan->update($validatedData);
 
         return redirect()->route('planes.index')->with('success', 'Plan actualizado exitosamente.');
     }
+
     public function destroy($slug)
     {
-        $plan = \App\Models\Planes::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $plan = \App\Models\Planes::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $plan->delete();
 
         return redirect()->route('planes.index')->with('success', 'Plan eliminado exitosamente.');
     }
+
     public function show($id)
     {
-        // Aquí puedes implementar la lógica para mostrar los detalles de un plan
+        $this->abortUnlessAdmin();
         $plan = \App\Models\Planes::findOrFail($id);
+
         return view('planes.show', compact('plan'));
     }
+
     public function toggleStatus($slug)
     {
-        $plan = \App\Models\Planes::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $plan = \App\Models\Planes::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         DB::enableQueryLog();
-        $plan->estado = $plan->estado == 0 ? 1 : 0; // Cambia el estado de 0 a 1 o de 1 a 
+        $plan->estado = $plan->estado == 0 ? 1 : 0;
         $plan->save();
 
         return redirect()->route('planes.index')->with('success', 'Estado del plan actualizado.');

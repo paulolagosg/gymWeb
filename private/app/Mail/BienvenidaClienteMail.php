@@ -21,7 +21,7 @@ class BienvenidaClienteMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Bienvenido a Max Fitness & Health')
+        return $this->subject('Bienvenido a Ampaya Gym')
             ->markdown('emails.bienvenida_cliente');
     }
 }

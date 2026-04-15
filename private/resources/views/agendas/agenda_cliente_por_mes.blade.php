@@ -1,12 +1,19 @@
 <x-admin-layout>
     <div class="py-4">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg text-center">
-                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+        <div class="">
+            <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
+                <div class="text-gray-700">
+                    <i class="fas fa-user fa-2x">&nbsp;{{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}</i>
+                    <br><small>{{ $cliente->plan->nombre ?? 'Sin plan' }}</small>
+                </div>
+                @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true))
+                <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
                 </a>
+                @endif
             </div>
-            <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
                 <form method="GET" class="flex items-center gap-4">
                     <label for="ano" class="text-gray-700 font-semibold">Seleccionar Año:</label>
                     <select name="ano" id="ano" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -23,7 +30,7 @@
             </div>
 
             <!-- Tabla de agendas -->
-            <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg overflow-x-auto">
                 <table class="w-full border-collapse">
                     <thead>
                         <tr class="bg-gray-100 border-b-2 border-gray-300">

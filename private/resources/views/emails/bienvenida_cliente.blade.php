@@ -1,7 +1,7 @@
 @component('mail::message')
 # ¡Hola {{ $cliente->nombres }}!
 
-Bienvenido/a a Max Fitness & Health. Aquí tienes tus credenciales de acceso:
+Bienvenido/a a Ampaya Gym. Aquí tienes tus credenciales de acceso:
 
 **Correo electrónico:** {{ $cliente->email }}<br>
 **Clave:** {{ $pwd }}
@@ -15,5 +15,5 @@ Acceder al sistema
 Si tienes alguna duda, no dudes en contactarnos.
 
 Saludos cordiales,<br>
-**Equipo Max Fitness & Health**
+**Equipo Ampaya Gym**
 @endcomponent

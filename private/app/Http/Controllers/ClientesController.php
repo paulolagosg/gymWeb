@@ -7,6 +7,7 @@ use App\Mail\RecordatorioCuotasVencidas;
 use App\Models\Agendas;
 use App\Models\Clientes;
 use App\Models\Generos;
+use App\Models\Gimnasios;
 use App\Models\IMCS;
 use App\Models\Planes;
 use App\Models\User;
@@ -18,6 +19,8 @@ use Barryvdh\DomPDF\Facade\Pdf; // Si usas barryvdh/laravel-dompdf
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use \App\Models\Perimetro;
 
 
@@ -62,7 +65,8 @@ class ClientesController extends Controller
         $estado = $alDia ? '<div class="text-green-700 mt-4">Al día</div>' : '<div class="text-red-700 mt-4">Atrasado</div>';
 
         $pesoReciente = $cliente->pesos()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$pesoReciente) {
             $pesoReciente = new \App\Models\Pesos();
@@ -72,7 +76,8 @@ class ClientesController extends Controller
         }
 
         $imcReciente = $cliente->imcs()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$imcReciente) {
             $imcReciente = new \App\Models\IMCS();
@@ -94,7 +99,8 @@ class ClientesController extends Controller
 
         $aguas = $cliente->aguas()->orderBy('created_at', 'desc')->get();
         $aguaReciente = $cliente->aguas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$aguaReciente) {
             $aguaReciente = new \App\Models\Aguas();
@@ -105,7 +111,8 @@ class ClientesController extends Controller
 
         $grasas = $cliente->grasas()->orderBy('created_at', 'desc')->get();
         $grasaReciente = $cliente->grasas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$grasaReciente) {
             $grasaReciente = new \App\Models\Grasas();
@@ -116,7 +123,8 @@ class ClientesController extends Controller
 
         $pmusculares = $cliente->pmusculares()->orderBy('created_at', 'desc')->get();
         $pmuscularReciente = $cliente->pmusculares()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$pmuscularReciente) {
             $pmuscularReciente = new \App\Models\PMusculares();
@@ -127,7 +135,8 @@ class ClientesController extends Controller
 
         $poseas = $cliente->poseas()->orderBy('created_at', 'desc')->get();
         $poseaReciente = $cliente->poseas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$poseaReciente) {
             $poseaReciente = new \App\Models\Poseas();
@@ -218,57 +227,66 @@ class ClientesController extends Controller
         );
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $usuario = auth()->user();
+        $usuario = Auth::user();
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasioSeleccionado = $idGimnasio;
 
-        if ($usuario->id_tipo_usuario > 2) {
+        if (!in_array((int) $usuario->id_tipo_usuario, [1, 2, 10], true)) {
             abort(403, 'No tienes permiso para acceder a esta sección.');
         }
-        DB::enableQueryLog();
-        if ($usuario->id_tipo_usuario == 1) {
-            // Admin: ve todos los clientes
-            $clientes = \App\Models\Clientes::with(['plan', 'user', 'cuotas', 'entrenador'])
-                ->join('users as u', 'clientes.id', '=', 'u.id_cliente')
-                ->join('tipos_usuarios as tu', 'u.id_tipo_usuario', '=', 'tu.id')
-                ->where('clientes.estado', 1)
-                ->select('clientes.*', 'tu.nombre as tipo_usuario')
-                ->get();
-        } else {
-            // Otros usuarios: solo sus clientes
-            $clientes = \App\Models\Clientes::with(['plan', 'user', 'cuotas', 'entrenador'])
-                ->join('users as u', 'clientes.id', '=', 'u.id_cliente')
-                ->join('tipos_usuarios as tu', 'u.id_tipo_usuario', '=', 'tu.id')
-                ->select('clientes.*', 'tu.nombre as tipo_usuario')
-                ->where('clientes.id_usuario', $usuario->id)
-                ->where('clientes.estado', 1)
-                ->get();
+
+        $query = \App\Models\Clientes::with(['plan', 'user', 'cuotas', 'entrenador', 'gimnasio'])
+            ->leftJoin('users as u', 'clientes.id', '=', 'u.id_cliente')
+            ->leftJoin('tipos_usuarios as tu', 'u.id_tipo_usuario', '=', 'tu.id')
+            ->select('clientes.*', 'tu.nombre as tipo_usuario')
+            ->when($idGimnasio, function ($subQuery) use ($idGimnasio) {
+                $subQuery->where('clientes.id_gimnasio', $idGimnasio);
+            })
+            ->where('clientes.estado', 1);
+
+        if ((int) $usuario->id_tipo_usuario === 2) {
+            $query->where('clientes.id_usuario', $usuario->id);
         }
-        //dd(DB::getQueryLog());
+
+        $clientes = $query->orderBy('clientes.nombres')->get();
+
         $fechaActual = Carbon::now()->toDateString();
 
         $clientesMorosos = $clientes->filter(function ($cliente) use ($fechaActual) {
             return $cliente->cuotas->contains(function ($cuota) use ($fechaActual) {
-                // Considera cuota morosa si el monto pagado es menor al monto a pagar y la fecha de vencimiento es menor o igual a la fecha actual
                 return $cuota->monto_pagado < $cuota->monto_pagar &&
                     $cuota->fecha_vencimiento <= $fechaActual;
             });
         });
 
-        return view('clientes.index', compact('clientes', 'clientesMorosos'));
+        return view('clientes.index', compact('clientes', 'clientesMorosos', 'gimnasios', 'gimnasioSeleccionado'));
     }
 
     public function morosos()
     {
-        $usuario = auth()->user();
+        $usuario = Auth::user();
+        $idGimnasio = Gimnasios::gimnasioActualId();
 
-        if ($usuario->id_tipo_usuario == 1) {
+        if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true)) {
             // Admin: ve todos los clientes
-            $clientes = \App\Models\Clientes::with(['plan', 'user', 'cuotas'])->where('estado', 1)->get();
+            $clientes = \App\Models\Clientes::with(['plan', 'user', 'cuotas'])
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->where('estado', 1)->get();
         } else {
             // Otros usuarios: solo sus clientes
             $clientes = \App\Models\Clientes::with(['plan', 'user', 'cuotas'])
                 ->where('id_usuario', $usuario->id)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
                 ->where('estado', 1)
                 ->get();
         }
@@ -299,27 +317,48 @@ class ClientesController extends Controller
 
     public function create()
     {
-        $generos = Generos::where('estado', 1)->get(); // Obtener géneros activos
-        $planes = Planes::where('estado', 1)->orderBy('nombre', 'asc')->get(); // Obtener planes activos
-        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get(); // Obtener tipos de usuarios activos
-        $motivos = \App\Models\Motivos::where('estado', 1)->where('tipo', 1)->orderBy('nombre', 'asc')->get(); // Obtener motivos de ingreso activos
-        $usuario = auth()->user();
-        if ($usuario->id_tipo_usuario == 1) {
-            // Admin: ve todos los clientes
-            $usuarios = User::where('id_tipo_usuario', 2)->get(); // Obtener usuarios activos
+        $usuario = Auth::user();
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $idGimnasio = $esSuperAdmin
+            ? (request()->filled('id_gimnasio') ? (int) request()->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+
+        $generos = Generos::where('estado', 1)->get();
+        $planes = Planes::where('estado', 1)
+            ->when(! $esSuperAdmin && $idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->orderBy('nombre', 'asc')
+            ->get();
+        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get();
+        $motivos = \App\Models\Motivos::where('estado', 1)->where('tipo', 1)->orderBy('nombre', 'asc')->get();
+
+        if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true)) {
+            $usuarios = User::where('id_tipo_usuario', 2)
+                ->when(! $esSuperAdmin && $idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
+                ->orderBy('name')
+                ->get();
         } else {
-            // Otros usuarios: solo sus clientes
-            $usuarios = User::where('id_tipo_usuario', 2) // Obtener usuarios activos
+            $usuarios = User::where('id_tipo_usuario', 2)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })
                 ->where('id', $usuario->id)
                 ->get();
         }
-        return view('clientes.create', compact('generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos'));
+
+        return view('clientes.create', compact('generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos', 'gimnasios', 'idGimnasio'));
     }
 
     public function store(Request $request)
     {
         try {
             DB::beginTransaction();
+            $usuarioActual = Auth::user();
+            $esSuperAdmin = (int) $usuarioActual->id_tipo_usuario === 10;
             $validatedData = $request->validate([
                 'nombres' => 'required|string|max:255',
                 'paterno' => 'required|string|max:255',
@@ -333,10 +372,11 @@ class ClientesController extends Controller
                 'id_genero' => 'required|exists:generos,id',
                 'direccion' => 'nullable|string|max:255',
                 'ciudad' => 'nullable|string|max:100',
-                'estado' => 'required|integer', // 1: activo, 0: inactivo
-                'descuento' => 'nullable|numeric|min:0', // Descuento en pesos
+                'estado' => 'required|integer',
+                'descuento' => 'nullable|numeric|min:0',
                 'id_usuario' => 'required|exists:users,id',
                 'id_tipo_usuario' => 'required|exists:tipos_usuarios,id',
+                'id_gimnasio' => ($esSuperAdmin ? 'required' : 'nullable') . '|exists:gimnasios,id',
                 'altura' => 'nullable|numeric|min:0',
                 'fecha_vencimiento' => 'required|date_format:Y-m-d',
                 'fecha_registro' => 'required|date_format:Y-m-d',
@@ -345,10 +385,30 @@ class ClientesController extends Controller
                 'otro_ingreso' => 'nullable|string|max:100',
                 'perfil' => 'nullable|string',
             ]);
+            $idGimnasio = $esSuperAdmin
+                ? (int) $validatedData['id_gimnasio']
+                : (Gimnasios::gimnasioActualId() ?: (int) ($validatedData['id_gimnasio'] ?? 0));
+
+            $trainerValido = User::where('id', $validatedData['id_usuario'])
+                ->where('id_tipo_usuario', 2)
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->exists();
+
+            $planValido = Planes::where('id', $validatedData['id_plan'])
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                })->exists();
+
+            if (! $trainerValido || ! $planValido) {
+                return redirect()->back()->withErrors(['id_usuario' => 'El cliente solo puede asociarse a entrenadores y planes de su gimnasio.'])->withInput($request->all());
+            }
+
             $fechaHoy = date('YmdHis');
             $validatedData['slug'] = hash('sha256', $validatedData['ci'] . $fechaHoy);
             $validatedData['fecha_ingreso'] = $validatedData['fecha_registro'];
             $validatedData['fecha_pago'] = $validatedData['fecha_vencimiento'];
+            $validatedData['id_gimnasio'] = $idGimnasio;
 
             // Convertir a objetos Carbon para manipulación
             $fechaInicio = Carbon::parse($validatedData['fecha_registro']);
@@ -406,6 +466,7 @@ class ClientesController extends Controller
             $validatedDataUser['porcentaje'] = 0; // Porcentaje opcional, entre 0 y 100
             $validatedDataUser['estado'] = 1; // Asignar el estado del usuario
             $validatedDataUser['id_cliente'] = $cliente->id; // Asociar el usuario al cliente
+            $validatedDataUser['id_gimnasio'] = $validatedData['id_gimnasio'];
             // Crear el usuario asociado al cliente
             User::create($validatedDataUser);
 
@@ -420,30 +481,49 @@ class ClientesController extends Controller
     }
     public function edit($slug)
     {
-        // Buscar el cliente por slug, no por id
-        $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
-        $generos = Generos::where('estado', 1)->get(); // Obtener géneros activos
-        $planes = Planes::where('estado', 1)->get();   // Obtener planes activos
-        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get(); // Obtener tipos de usuarios activos
+        $usuario = Auth::user();
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+
+        $cliente = \App\Models\Clientes::with('plan')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->where('slug', $slug)
+            ->firstOrFail();
+        $gymObjetivo = $cliente->id_gimnasio ?: $idGimnasio;
+        $generos = Generos::where('estado', 1)->get();
+        $planes = Planes::where('estado', 1)
+            ->when(! $esSuperAdmin && $gymObjetivo, function ($query) use ($gymObjetivo) {
+                $query->where('id_gimnasio', $gymObjetivo);
+            })->get();
+        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get();
         $motivos = \App\Models\Motivos::where('estado', 1)->where('tipo', 2)->orderBy('nombre', 'asc')->get(); // Obtener motivos de ingreso activos
         $motivosi = \App\Models\Motivos::where('estado', 1)->where('tipo', 1)->orderBy('nombre', 'asc')->get(); // Obtener motivos de ingreso activos
         $clientes_duos = Clientes::join('planes', 'clientes.id_plan', 'planes.id')
-            ->where('planes.tipo', 2)
+            ->when($gymObjetivo, function ($query) use ($gymObjetivo) {
+                $query->where('clientes.id_gimnasio', $gymObjetivo);
+            })
             ->orderBy('clientes.nombres', 'asc')
             ->select('clientes.id', 'clientes.nombres', 'clientes.paterno', 'clientes.materno')
             ->get();
 
-        $usuario = auth()->user();
-        if ($usuario->id_tipo_usuario == 1) {
-            // Admin: ve todos los clientes
-            $usuarios = User::where('id_tipo_usuario', 2)->get();
-        }
-        if ($usuario->id_tipo_usuario == 2) {
+        if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true)) {
             $usuarios = User::where('id_tipo_usuario', 2)
+                ->when(! $esSuperAdmin && $gymObjetivo, function ($query) use ($gymObjetivo) {
+                    $query->where('id_gimnasio', $gymObjetivo);
+                })->get();
+        }
+        if ((int) $usuario->id_tipo_usuario === 2) {
+            $usuarios = User::where('id_tipo_usuario', 2)
+                ->when($gymObjetivo, function ($query) use ($gymObjetivo) {
+                    $query->where('id_gimnasio', $gymObjetivo);
+                })
                 ->where('id', $usuario->id)
                 ->get();
         }
-        if ($usuario->id_tipo_usuario > 2) {
+        if (!in_array((int) $usuario->id_tipo_usuario, [1, 2, 10], true)) {
             $id_cliente = $usuario->id_cliente;
             $usuarios = User::join('clientes', 'clientes.id', 'users.id_cliente')
                 ->join('users as u2', 'clientes.id_usuario', 'u2.id')
@@ -451,12 +531,17 @@ class ClientesController extends Controller
                 ->select('u2.id', 'u2.name')
                 ->get();
         }
-        return view('clientes.edit', compact('cliente', 'generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos', 'motivosi', 'clientes_duos'));
+        return view('clientes.edit', compact('cliente', 'generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos', 'motivosi', 'clientes_duos', 'gimnasios'));
     }
     public function update(Request $request, $slug)
     {
-        // Aquí puedes implementar la lógica para actualizar un cliente existente
-        $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
+        $usuarioActual = Auth::user();
+        $esSuperAdmin = (int) $usuarioActual->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $cliente = \App\Models\Clientes::with('plan')
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->where('slug', $slug)->firstOrFail();
 
         $validatedData = $request->validate([
             'ci' => 'nullable|string|max:255',
@@ -466,12 +551,14 @@ class ClientesController extends Controller
             'email' => 'nullable|email|unique:clientes,email,' . $cliente->id,
             'id_plan' => 'required|exists:planes,id',
             'id_usuario' => 'required|exists:users,id',
+            'id_tipo_usuario' => 'required|exists:tipos_usuarios,id',
+            'id_gimnasio' => 'nullable|exists:gimnasios,id',
             'telefono' => 'nullable|string|max:15',
             'direccion' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date_format:Y-m-d',
             'fecha_ingreso' => 'required|date_format:Y-m-d',
             'fecha_fin' => 'required|date_format:Y-m-d',
-            'estado' => 'required|integer', // 1: activo, 0: inactivo
+            'estado' => 'required|integer',
             'altura' => 'nullable|numeric|min:0',
             'id_motivo_egreso' => 'nullable|exists:motivos,id',
             'otro_egreso' => 'nullable|string|max:100',
@@ -494,20 +581,88 @@ class ClientesController extends Controller
             'estado.required' => 'Debe especificar el estado del cliente',
             'estado.integer' => 'El estado debe ser un valor numérico',
         ]);
+        $gymObjetivo = $esSuperAdmin
+            ? (int) ($validatedData['id_gimnasio'] ?? $cliente->id_gimnasio)
+            : ($cliente->id_gimnasio ?: Gimnasios::gimnasioActualId());
+
+        $trainerValido = User::where('id', $validatedData['id_usuario'])
+            ->where('id_tipo_usuario', 2)
+            ->when($gymObjetivo, function ($query) use ($gymObjetivo) {
+                $query->where('id_gimnasio', $gymObjetivo);
+            })->exists();
+
+        $planValido = Planes::where('id', $validatedData['id_plan'])
+            ->when($gymObjetivo, function ($query) use ($gymObjetivo) {
+                $query->where('id_gimnasio', $gymObjetivo);
+            })->exists();
+
+        if (! $trainerValido || ! $planValido) {
+            return redirect()->back()->withErrors(['id_usuario' => 'El cliente solo puede asociarse a entrenadores y planes de su gimnasio.'])->withInput($request->all());
+        }
+
         $fechaHoy = date('YmdHis');
 
         $validatedData['slug'] = hash('sha256', $cliente->ci . $fechaHoy);
+        $validatedData['id_gimnasio'] = $gymObjetivo;
 
-        // Actualizar el cliente en la base de datos
         $cliente->update($validatedData);
 
-        return redirect()->route('clientes.opciones.portada', $validatedData['slug'])->with('success', 'Cliente actualizado exitosamente.');
+        $usuarioCliente = User::where('id_cliente', $cliente->id)->first();
+        if ($usuarioCliente) {
+            $usuarioCliente->update([
+                'name' => trim(($validatedData['nombres'] ?? '') . ' ' . ($validatedData['paterno'] ?? '') . ' ' . ($validatedData['materno'] ?? '')),
+                'email' => $validatedData['email'] ?: $usuarioCliente->email,
+                'id_tipo_usuario' => (int) $validatedData['id_tipo_usuario'],
+                'id_gimnasio' => $validatedData['id_gimnasio'],
+            ]);
+        }
+
+        return redirect()->route('clientes.index')->with('success', 'Cliente actualizado exitosamente.');
     }
     public function destroy($id)
     {
-        // Aquí puedes implementar la lógica para eliminar un cliente
-        $cliente = \App\Models\Clientes::findOrFail($id);
-        $cliente->delete();
+        $usuario = Auth::user();
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
+        $cliente = \App\Models\Clientes::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->findOrFail($id);
+
+        DB::transaction(function () use ($cliente) {
+            $agendaIds = DB::table('agendas')->where('id_cliente', $cliente->id)->pluck('id');
+
+            if ($agendaIds->isNotEmpty() && Schema::hasTable('agendas_ejercicios')) {
+                DB::table('agendas_ejercicios')->whereIn('id_agenda', $agendaIds)->delete();
+            }
+
+            if (Schema::hasTable('tareas')) {
+                DB::table('tareas')->where('id_cliente', $cliente->id)->delete();
+            }
+
+            if (Schema::hasTable('parq_respuestas')) {
+                DB::table('parq_respuestas')->where('id_cliente', $cliente->id)->delete();
+            }
+
+            if (Schema::hasTable('cuestionarios_historicos')) {
+                DB::table('cuestionarios_historicos')->where('id_cliente', $cliente->id)->delete();
+            }
+
+            $cliente->cuotas()->delete();
+            $cliente->pesos()->delete();
+            $cliente->imcs()->delete();
+            $cliente->aguas()->delete();
+            $cliente->grasas()->delete();
+            $cliente->pmusculares()->delete();
+            $cliente->poseas()->delete();
+            $cliente->perimetros()->delete();
+            $cliente->cuestionarios()->delete();
+            $cliente->cuestionariosHistoricos()->delete();
+            $cliente->evaluacionInicial()->delete();
+
+            DB::table('agendas')->where('id_cliente', $cliente->id)->delete();
+            User::where('id_cliente', $cliente->id)->delete();
+            $cliente->delete();
+        });
 
         return redirect()->route('clientes.index')->with('success', 'Cliente eliminado exitosamente.');
     }
@@ -769,8 +924,10 @@ class ClientesController extends Controller
         // $perimetros = $cliente->perimetros()->orderBy('created_at', 'desc')->get();
         // $perimetroReciente = $perimetros->first();
 
+        $pesoChartData = $this->buildMetricChartData($pesos, 'peso');
+
         //return view('clientes.peso', compact('cliente', 'pesos', 'pesoReciente', 'perimetros', 'perimetroReciente'));
-        return view('clientes.peso', compact('cliente', 'pesos', 'pesoReciente'));
+        return view('clientes.peso', compact('cliente', 'pesos', 'pesoReciente', 'pesoChartData'));
     }
 
     // Guardar peso + mediciones
@@ -880,7 +1037,8 @@ class ClientesController extends Controller
         $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
         $imcs = $cliente->imcs()->orderBy('created_at', 'desc')->get();
         $imcReciente = $cliente->imcs()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$imcReciente) {
             $imcReciente = new \App\Models\IMCS();
@@ -888,7 +1046,10 @@ class ClientesController extends Controller
             $imcReciente->created_at = Carbon::now();
             $imcReciente->updated_at = Carbon::now();
         }
-        return view('clientes.imc', compact('cliente', 'imcs', 'imcReciente'));
+
+        $imcChartData = $this->buildMetricChartData($imcs, 'imc');
+
+        return view('clientes.imc', compact('cliente', 'imcs', 'imcReciente', 'imcChartData'));
     }
     public function createImc($slug)
     {
@@ -934,7 +1095,8 @@ class ClientesController extends Controller
         $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
         $aguas = $cliente->aguas()->orderBy('created_at', 'desc')->get();
         $aguaReciente = $cliente->aguas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$aguaReciente) {
             $aguaReciente = new \App\Models\Aguas();
@@ -943,7 +1105,9 @@ class ClientesController extends Controller
             $aguaReciente->updated_at = Carbon::now();
         }
 
-        return view('clientes.aguas', compact('cliente', 'aguas', 'aguaReciente'));
+        $aguaChartData = $this->buildMetricChartData($aguas, 'valor');
+
+        return view('clientes.aguas', compact('cliente', 'aguas', 'aguaReciente', 'aguaChartData'));
     }
     public function storeAgua(Request $request, $slug)
     {
@@ -984,7 +1148,8 @@ class ClientesController extends Controller
         $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
         $grasas = $cliente->grasas()->orderBy('created_at', 'desc')->get();
         $grasaReciente = $cliente->grasas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$grasaReciente) {
             $grasaReciente = new \App\Models\Grasas();
@@ -993,7 +1158,9 @@ class ClientesController extends Controller
             $grasaReciente->updated_at = Carbon::now();
         }
 
-        return view('clientes.pgrasa', compact('cliente', 'grasas', 'grasaReciente'));
+        $grasaChartData = $this->buildMetricChartData($grasas, 'valor');
+
+        return view('clientes.pgrasa', compact('cliente', 'grasas', 'grasaReciente', 'grasaChartData'));
     }
     public function storeGrasa(Request $request, $slug)
     {
@@ -1035,7 +1202,8 @@ class ClientesController extends Controller
         $pmuscular = $cliente->pmusculares()->orderBy('created_at', 'desc')->get();
         //$pmuscular = $pmuscular->sortBy('valor');
         $pmuscularReciente = $cliente->pmusculares()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$pmuscularReciente) {
             $pmuscularReciente = new \App\Models\Pmusculares();
@@ -1044,7 +1212,9 @@ class ClientesController extends Controller
             $pmuscularReciente->updated_at = Carbon::now();
         }
 
-        return view('clientes.pmuscular', compact('cliente', 'pmuscular', 'pmuscularReciente'));
+        $pmuscularChartData = $this->buildMetricChartData($pmuscular, 'valor');
+
+        return view('clientes.pmuscular', compact('cliente', 'pmuscular', 'pmuscularReciente', 'pmuscularChartData'));
     }
     public function storePmuscular(Request $request, $slug)
     {
@@ -1085,7 +1255,8 @@ class ClientesController extends Controller
         $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
         $posea = $cliente->poseas()->orderBy('created_at', 'desc')->get();
         $poseaReciente = $cliente->poseas()
-            ->orderByRaw('GREATEST(created_at, updated_at) DESC')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
             ->first();
         if (!$poseaReciente) {
             $poseaReciente = new \App\Models\Poseas();
@@ -1094,7 +1265,9 @@ class ClientesController extends Controller
             $poseaReciente->updated_at = Carbon::now();
         }
 
-        return view('clientes.posea', compact('cliente', 'posea', 'poseaReciente'));
+        $poseaChartData = $this->buildMetricChartData($posea, 'valor');
+
+        return view('clientes.posea', compact('cliente', 'posea', 'poseaReciente', 'poseaChartData'));
     }
     public function storePosea(Request $request, $slug)
     {
@@ -1218,6 +1391,63 @@ class ClientesController extends Controller
     }
 
     /****** */
+    private function buildMetricChartData($registros, string $campo): array
+    {
+        $ordenados = $registros->sortBy('created_at')->values();
+
+        return [
+            'labels' => $ordenados->pluck('created_at')
+                ->map(fn($fecha) => Carbon::parse($fecha)->format('d/m/Y'))
+                ->values()
+                ->all(),
+            'values' => $ordenados->pluck($campo)
+                ->map(fn($valor) => $valor !== null ? (float) $valor : null)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function buildReporteChartData($pesos, $imcs, $grasas, $posea, $pmuscular, $perimetros): array
+    {
+        $pesoChartData = $this->buildMetricChartData($pesos, 'peso');
+        $imcChartData = $this->buildMetricChartData($imcs, 'imc');
+        $grasaChartData = $this->buildMetricChartData($grasas, 'valor');
+        $poseaChartData = $this->buildMetricChartData($posea, 'valor');
+        $pmuscularChartData = $this->buildMetricChartData($pmuscular, 'valor');
+        $perimetrosOrdenados = $perimetros->sortBy('created_at')->values();
+
+        return [
+            'pesosLabels' => $pesoChartData['labels'],
+            'pesosData' => $pesoChartData['values'],
+            'imcsLabels' => $imcChartData['labels'],
+            'imcsData' => $imcChartData['values'],
+            'grasasLabels' => $grasaChartData['labels'],
+            'grasasData' => $grasaChartData['values'],
+            'poseaLabels' => $poseaChartData['labels'],
+            'poseaData' => $poseaChartData['values'],
+            'pmuscularLabels' => $pmuscularChartData['labels'],
+            'pmuscularData' => $pmuscularChartData['values'],
+            'perimetros' => $perimetrosOrdenados->map(function ($perimetro) {
+                return Arr::only($perimetro->toArray(), [
+                    'cabeza',
+                    'brazo_relajado',
+                    'brazo_flexionado_tension',
+                    'antebrazo',
+                    'torax_mesoexternal',
+                    'cintura_minima',
+                    'caderas_maxima',
+                    'muslo_superior',
+                    'muslo_medial',
+                    'pantorrilla_maxima',
+                ]);
+            })->all(),
+            'perimetrosLabels' => $perimetrosOrdenados->pluck('created_at')
+                ->map(fn($fecha) => Carbon::parse($fecha)->format('d/m/Y'))
+                ->values()
+                ->all(),
+        ];
+    }
+
     public function reporte($slug)
     {
         $cliente = \App\Models\Clientes::with('plan')->where('slug', $slug)->firstOrFail();
@@ -1231,6 +1461,8 @@ class ClientesController extends Controller
         $pmuscular = $cliente->pmusculares()->orderBy('created_at')->get();
         $perimetros = $cliente->perimetros()->orderBy('created_at')->get();
         $fitPlan = $cliente->cuestionarios()->where('id_cliente', $cliente->id)->first();
+        $reportChartData = $this->buildReporteChartData($pesos, $imcs, $grasas, $posea, $pmuscular, $perimetros);
+
         return view('clientes.reporte', compact(
             'cliente',
             'pesos',
@@ -1242,7 +1474,8 @@ class ClientesController extends Controller
             'grasas',
             'posea',
             'pmuscular',
-            'perimetros'
+            'perimetros',
+            'reportChartData'
         ));
     }
 

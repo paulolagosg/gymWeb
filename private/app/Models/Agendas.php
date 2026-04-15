@@ -12,6 +12,7 @@ class Agendas extends Model
     protected $fillable = [
         'id_cliente',
         'id_usuario',
+        'id_gimnasio',
         'fecha_inicio',
         'fecha_fin',
         'titulo',
@@ -31,6 +32,11 @@ class Agendas extends Model
     public function usuario()
     {
         return $this->belongsTo('App\Models\User', 'id_usuario');
+    }
+
+    public function gimnasio()
+    {
+        return $this->belongsTo(Gimnasios::class, 'id_gimnasio');
     }
     // public function ejercicios()
     // {

@@ -2,8 +2,8 @@
 @component('mail::message')
 # ¡Hola {{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}!
 
-Adjunto encontrarás un reporte de evolución en Max Fitness & Health, junto con tu información financiera.
+Adjunto encontrarás un reporte de evolución en Ampaya Gym, junto con tu información financiera.
 
 Saludos cordiales,<br>
-**Equipo Max Fitness & Health**
+**Equipo Ampaya Gym**
 @endcomponent

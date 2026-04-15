@@ -1,4 +1,5 @@
 <x-admin-layout>
+    @php($isAdminLike = $esAdminLike ?? false)
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4 p-4 rounded-lg">
@@ -25,6 +26,16 @@
                     @endif
                     <h2 class="text-xl font-bold mb-4">Editar Formación</h2>
                     <form action="{{ route('cursos.update', $curso->slug) }}" method="POST">
+                        @if($isAdminLike)
+                        <div class="mt-4">
+                            <label for="id_entrenador" class="block text-sm font-medium text-gray-700">Entrenador</label>
+                            <select id="id_entrenador" name="id_entrenador" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                @foreach($usuarios as $usuario)
+                                <option value="{{ $usuario->id }}" {{ (string) old('id_entrenador', $curso->id_entrenador) === (string) $usuario->id ? 'selected' : '' }}>{{ $usuario->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         @csrf
                         @method('PUT')
                         <div class="mt-4">
@@ -65,9 +76,9 @@
                     <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
                         Guardar Cambios
                     </button>
-                    <button type="button" onclick="location.href='{{ route('cursos.index') }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                    <a href="{{ route('cursos.index') }}" class="inline-block bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
                         Cancelar
-                    </button>
+                    </a>
                 </div>
                 </form>
             </div>

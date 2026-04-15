@@ -1,20 +1,29 @@
 <x-admin-layout>
+    @php($isAdminLike = in_array((int) auth()->user()->id_tipo_usuario, [1, 10], true) || (int) auth()->user()->id_clasificacion === 3)
+    @php($isSuperAdmin = (int) auth()->user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4  p-4 rounded-lg">
-                <a href="{{ route('portada') }}" class="hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
+
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="flex items-center justify-between p-4">
-                    <h1 class="text-2xl font-bold">Formación Continua</h1>
-                </div>
-                <div class="flex items-center justify-between p-4">
-                    <a href="{{ route('cursos.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                <div class="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                    <a href="{{ route('cursos.create', $isSuperAdmin && !empty($gimnasioSeleccionado) ? ['id_gimnasio' => $gimnasioSeleccionado] : []) }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                         Agregar Formación
                     </a>
+
+                    @if($isSuperAdmin && isset($gimnasios))
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
+                    @endif
                 </div>
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
                     @if(session('success'))
@@ -39,6 +48,12 @@
                                 <th style="text-align: center;">Fecha Término</th>
                                 <th style="text-align: center;">Curso</th>
                                 <th style="text-align: center;">Institución</th>
+                                @if($isAdminLike)
+                                <th style="text-align: center;">Entrenador</th>
+                                @endif
+                                @if($isSuperAdmin)
+                                <th style="text-align: center;">Gimnasio</th>
+                                @endif
                                 <th style="text-align: center;">Modalidad</th>
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
@@ -58,13 +73,23 @@
                                 <td style="text-align: center;">
                                     {{ $c->institucion }}
                                 </td>
+                                @if($isAdminLike)
                                 <td style="text-align: center;">
-                                    {{ $c->modalidad }}
+                                    {{ $c->entrenador_nombre ?? '-' }}
+                                </td>
+                                @endif
+                                @if($isSuperAdmin)
+                                <td style="text-align: center;">
+                                    {{ $c->gimnasio_nombre ?? '-' }}
+                                </td>
+                                @endif
+                                <td style="text-align: center;">
+                                    {{ $c->modalidad_label ?? $c->modalidad }}
                                 </td>
                                 <td style="text-align: center;">
-                                    <button class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded" onclick="window.location.href='{{ route('cursos.edit', $c->slug) }}'">
+                                    <a href="{{ route('cursos.edit', $c->slug) }}" class="inline-block bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                                         Editar
-                                    </button>
+                                    </a>
                                     <form action="{{ route('cursos.destroy', $c->slug) }}" method="POST" style="display:inline;">
                                         @csrf
                                         @method('DELETE')

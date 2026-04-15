@@ -9,6 +9,7 @@ use App\Models\EvaluacionInicialPregunta;
 use App\Models\EvaluacionInicialSeccion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class EvaluacionInicialController extends Controller
@@ -155,8 +156,8 @@ class EvaluacionInicialController extends Controller
 
     private function abortUnlessAdmin(): void
     {
-        if ((int) auth()->user()->id_tipo_usuario !== 1) {
-            abort(403);
+        if ((int) Auth::user()->id_tipo_usuario !== 1) {
+            abort(403, 'No tiene acceso');
         }
     }
 
@@ -167,7 +168,7 @@ class EvaluacionInicialController extends Controller
             abort(403);
         }
 
-        if ((int) $user->id_tipo_usuario === 1) {
+        if (in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             return;
         }
 

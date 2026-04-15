@@ -1,4 +1,5 @@
 <x-admin-layout>
+    @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4">
@@ -12,6 +13,18 @@
                 <div class="p-6 text-gray-900">
                     <form action="{{ route('planes.store') }}" method="POST">
                         @csrf
+                        @if($isSuperAdmin)
+                        <div class="mb-4 sm:mb-0">
+                            <label for="id_gimnasio" class="block text-gray-700">Gimnasio</label>
+                            <select id="id_gimnasio" name="id_gimnasio" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                                @foreach($gimnasios as $gimnasio)
+                                <option value="{{ $gimnasio->id }}" {{ (string) old('id_gimnasio', $gimnasioSeleccionado) === (string) $gimnasio->id ? 'selected' : '' }}>
+                                    {{ $gimnasio->nombre }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         <div class="mb-4 sm:mb-0">
                             <label for="nombre" class="block text-gray-700">Nombre del Plan</label>
                             <input type="text" id="nombre" name="nombre" value="{{ old('nombre') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
@@ -57,9 +70,9 @@
                             <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
                                 Guardar Cambios
                             </button>
-                            <button type="button" onclick="location.href='{{ route('planes.index') }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                            <a href="{{ route('planes.index') }}" class="inline-block bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
                                 Cancelar
-                            </button>
+                            </a>
                         </div>
                         <span class="hidden bg-green-600 bg-green-800 hover:bg-green-800 bg-red-600 bg-red-800 hover:bg-red-800"></span>
                         <span class="hidden bg-green-100 border-green-400 text-green-700"></span>

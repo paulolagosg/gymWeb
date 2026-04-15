@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Gimnasios;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CursosController extends Controller
@@ -10,22 +13,52 @@ class CursosController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $usuario = auth()->user();
-        $cursos = \App\Models\EntrenadoresCursos::where('id_entrenador', $usuario->id)
-            ->orderBy('created_at', 'desc')
-            ->select(
-                'id',
-                'curso',
-                'fecha_inicio',
-                'fecha_fin',
-                DB::raw("case modalidad when 1 then 'Presencial' when 2 then 'On-line' else 'Híbrido' end modalidad"),
-                'institucion',
-                'slug'
-            )
+        $usuario = Auth::user();
+        $esAdminLike = in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || (int) $usuario->id_clasificacion === 3;
+        $esSuperAdmin = (int) $usuario->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = $idGimnasio;
+        $usuarios = User::where('id_tipo_usuario', 2)
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->orderBy('name')
             ->get();
-        return view('cursos.index', compact('cursos'));
+
+        if ($esAdminLike) {
+            $cursos = \App\Models\EntrenadoresCursos::join('users', 'users.id', '=', 'entrenadores_cursos.id_entrenador')
+                ->leftJoin('gimnasios', 'gimnasios.id', '=', 'users.id_gimnasio')
+                ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                    $query->where('users.id_gimnasio', $idGimnasio);
+                })
+                ->orderBy('entrenadores_cursos.created_at', 'desc')
+                ->select(
+                    'entrenadores_cursos.*',
+                    DB::raw("case entrenadores_cursos.modalidad when 1 then 'Presencial' when 2 then 'On-line' else 'Híbrido' end as modalidad_label"),
+                    DB::raw('users.name as entrenador_nombre'),
+                    DB::raw('gimnasios.nombre as gimnasio_nombre')
+                )
+                ->get();
+        } else {
+            $cursos = \App\Models\EntrenadoresCursos::where('id_entrenador', $usuario->id)
+                ->orderBy('created_at', 'desc')
+                ->select(
+                    'id',
+                    'curso',
+                    'fecha_inicio',
+                    'fecha_fin',
+                    DB::raw("case modalidad when 1 then 'Presencial' when 2 then 'On-line' else 'Híbrido' end as modalidad_label"),
+                    'institucion',
+                    'slug'
+                )
+                ->get();
+        }
+        return view('cursos.index', compact('cursos', 'gimnasios', 'gimnasioSeleccionado', 'usuarios'));
     }
 
     /**
@@ -33,7 +66,20 @@ class CursosController extends Controller
      */
     public function create()
     {
-        return view('cursos.create');
+        $usuario = Auth::user();
+        $esAdminLike = in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || (int) $usuario->id_clasificacion === 3;
+        $idGimnasio = (int) $usuario->id_tipo_usuario === 10
+            ? (request()->filled('id_gimnasio') ? (int) request()->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $usuarios = $esAdminLike
+            ? User::where('id_tipo_usuario', 2)->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })->orderBy('name')->get()
+            : collect([$usuario]);
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = $idGimnasio;
+
+        return view('cursos.create', compact('usuarios', 'gimnasios', 'gimnasioSeleccionado', 'esAdminLike'));
     }
 
     /**
@@ -47,9 +93,11 @@ class CursosController extends Controller
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'modalidad' => 'required|in:1,2,3',
             'institucion' => 'required|string|max:255',
+            'id_entrenador' => 'nullable|exists:users,id',
         ]);
-        $usuario = auth()->user();
-        $validated['id_entrenador'] = $usuario->id;
+        $usuario = Auth::user();
+        $esAdminLike = in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || (int) $usuario->id_clasificacion === 3;
+        $validated['id_entrenador'] = $esAdminLike ? (int) $validated['id_entrenador'] : $usuario->id;
         $validated['slug'] = hash('sha256', $validated['curso'] .  '-' . uniqid());
 
         \App\Models\EntrenadoresCursos::create($validated);
@@ -62,7 +110,11 @@ class CursosController extends Controller
     public function edit($slug)
     {
         $curso = \App\Models\EntrenadoresCursos::where('slug', $slug)->firstOrFail();
-        return view('cursos.edit', compact('curso'));
+        $usuario = Auth::user();
+        $esAdminLike = in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || (int) $usuario->id_clasificacion === 3;
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $usuarios = $esAdminLike ? User::where('id_tipo_usuario', 2)->orderBy('name')->get() : collect([$usuario]);
+        return view('cursos.edit', compact('curso', 'usuarios', 'gimnasios', 'esAdminLike'));
     }
     /**
      * Update the specified resource in storage.
@@ -76,7 +128,11 @@ class CursosController extends Controller
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'modalidad' => 'required|in:1,2,3',
             'institucion' => 'required|string|max:255',
+            'id_entrenador' => 'nullable|exists:users,id',
         ]);
+        $usuario = Auth::user();
+        $esAdminLike = in_array((int) $usuario->id_tipo_usuario, [1, 10], true) || (int) $usuario->id_clasificacion === 3;
+        $validated['id_entrenador'] = $esAdminLike ? (int) $validated['id_entrenador'] : $curso->id_entrenador;
         $validated['slug'] = hash('sha256', $validated['curso'] . '-' . uniqid());
         $curso->update($validated);
         return redirect()->route('cursos.index')->with('success', 'Curso actualizado exitosamente.');

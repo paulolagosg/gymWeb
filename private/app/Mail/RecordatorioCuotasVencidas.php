@@ -23,8 +23,8 @@ class RecordatorioCuotasVencidas extends Mailable
     {
         $count = $this->cuotasVencidas->count();
         $subject = $count > 1
-            ? "Tienes {$count} cuotas vencidas - Max Fitness & Health"
-            : "Tienes una cuota vencida - Max Fitness & Health";
+            ? "Tienes {$count} cuotas vencidas - Ampaya Gym"
+            : "Tienes una cuota vencida - Ampaya Gym";
 
         return $this->subject($subject)
             ->markdown('emails.recordatorio_cuotas_vencidas');

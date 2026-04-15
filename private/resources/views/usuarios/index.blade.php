@@ -1,16 +1,29 @@
 <x-admin-layout>
+    @php($isAdminLike = in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true))
+    @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('portada') }}" class="text-gray-700 hover:text-gray-500">
-                    <i class="fas fa-circle-left fa-2x">&nbsp;</i>
-                </a>
-            </div>
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-4 text-gray-900 items-center flex justify-between text-end">
+                <div class="p-4 text-gray-900 items-center flex flex-col gap-3 md:flex-row md:justify-between text-end">
+                    @if($isAdminLike)
                     <a href="{{ route('usuarios.create') }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                         Agregar Usuario
                     </a>
+                    @endif
+
+                    @if($isSuperAdmin && isset($gimnasios))
+                    <form method="GET" class="flex items-center gap-2">
+                        <label for="id_gimnasio" class="text-sm font-semibold text-gray-700">Filtrar por gimnasio:</label>
+                        <select name="id_gimnasio" id="id_gimnasio" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            @foreach($gimnasios as $gimnasio)
+                            <option value="{{ $gimnasio->id }}" {{ (string) ($gimnasioSeleccionado ?? '') === (string) $gimnasio->id ? 'selected' : '' }}>
+                                {{ $gimnasio->nombre }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </form>
+                    @endif
                 </div>
                 <div class="p-6 text-gray-900 overflow-x-auto w-full">
                     @if(session('success'))
@@ -36,6 +49,7 @@
                                 <th style="text-align: center;">Valor Hora Individual</th>
                                 <th style="text-align: center;">Valor Hora Duo</th>
                                 <th style="text-align: center;">Tipo de Usuario</th>
+                                <th style="text-align: center;">Gimnasio</th>
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
                         </thead>
@@ -49,10 +63,22 @@
                                 <td>
                                     {{ $user->tipoUsuario->nombre ?? '-' }}
                                 </td>
-                                <td style="text-align: center;">
-                                    <button type="button" class="bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded" onclick="location.href='{{ route('usuarios.edit', $user->id) }}'">
+                                <td>
+                                    {{ $user->gimnasio->nombre ?? 'Sin gimnasio' }}
+                                </td>
+                                <td style="text-align: center;" nowrap="nowrap">
+                                    <a href="{{ route('usuarios.edit', $user->id) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
                                         Editar
-                                    </button>
+                                    </a>
+                                    @if($isAdminLike)
+                                    <form action="{{ route('usuarios.destroy', $user->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar este usuario y sus datos asociados?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="bg-red-500 hover:bg-red-800 text-white font-bold py-1 px-2 rounded ml-2">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach

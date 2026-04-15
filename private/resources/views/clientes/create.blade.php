@@ -1,4 +1,5 @@
 <x-admin-layout>
+    @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4">
@@ -93,6 +94,20 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+                            @if($isSuperAdmin)
+                            <div class="mb-4">
+                                <label for="id_gimnasio" class="block text-sm font-medium text-gray-700">Gimnasio</label>
+                                <select name="id_gimnasio" id="id_gimnasio" required
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    <option value="">Seleccionar gimnasio</option>
+                                    @foreach ($gimnasios as $gimnasio)
+                                    <option value="{{ $gimnasio->id }}" {{ (string) old('id_gimnasio', $idGimnasio) === (string) $gimnasio->id ? 'selected' : '' }}>
+                                        {{ $gimnasio->nombre }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @endif
                             <div class="mb-4">
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Incluir Activación</label>
                                 <select name="activacion" id="activacion" required
@@ -108,7 +123,7 @@
                                     class="select2 mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                     <option value="">Seleccionar plan</option>
                                     @foreach ($planes as $plan)
-                                    <option value="{{ $plan->id }}" {{ old('id_plan') == $plan->id  ? 'selected' : '' }}>
+                                    <option value="{{ $plan->id }}" data-gimnasio="{{ $plan->id_gimnasio }}" {{ old('id_plan') == $plan->id  ? 'selected' : '' }}>
                                         {{ $plan->nombre }} - ${{ $plan->valor }}
                                     </option>
                                     @endforeach
@@ -127,7 +142,7 @@
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                     <option value="">Seleccionar</option>
                                     @foreach ($usuarios as $usuario)
-                                    <option value="{{ $usuario->id }}" {{ old('id_usuario') == $usuario->id ? 'selected' : '' }}>
+                                    <option value="{{ $usuario->id }}" data-gimnasio="{{ $usuario->id_gimnasio }}" {{ old('id_usuario') == $usuario->id ? 'selected' : '' }}>
                                         {{ $usuario->name }}
                                     </option>
                                     @endforeach
@@ -156,7 +171,7 @@
                             </div>
 
                             <div class="mb-4 sm:mb-0">
-                                <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">¿Cómo llegó a Max?</label>
+                                <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">¿Cómo llegó al gimnasio?</label>
                                 <select name="id_motivo_ingreso" id="id_motivo_ingreso" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                     <option value="">Seleccionar motivo</option>
@@ -201,9 +216,9 @@
                             <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">
                                 Guardar Cambios
                             </button>
-                            <button type="button" onclick="location.href='{{ route('clientes.index') }}'" class="bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
+                            <a href="{{ route('clientes.index') }}" class="inline-block bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded ml-2">
                                 Cancelar
-                            </button>
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -212,19 +227,60 @@
     </div>
 </x-admin-layout>
 <script>
-    document.getElementById('id_motivo_ingreso').addEventListener('change', function() {
-        var otroDiv = document.getElementById('divOtro');
-        var otroLabel = otroDiv.querySelector('label');
-        var otroInput = otroDiv.querySelector('input');
-        if (this.options[this.selectedIndex].text === 'Otro') {
-            otroDiv.style.display = 'block';
-            otroLabel.style.display = 'block';
-            otroInput.setAttribute('required', 'required');
-        } else {
-            otroDiv.style.display = 'none';
-            otroLabel.style.display = 'none';
-            otroInput.removeAttribute('required');
-            otroInput.value = '';
+    document.addEventListener('DOMContentLoaded', function() {
+        const motivoIngreso = document.getElementById('id_motivo_ingreso');
+        const gimnasioSelect = document.getElementById('id_gimnasio');
+        const planSelect = document.getElementById('id_plan');
+        const entrenadorSelect = document.getElementById('id_usuario');
+
+        const filtrarOpcionesPorGimnasio = () => {
+            if (!gimnasioSelect || !planSelect || !entrenadorSelect) {
+                return;
+            }
+
+            const gimnasioId = gimnasioSelect.value;
+
+            [planSelect, entrenadorSelect].forEach((select) => {
+                Array.from(select.options).forEach((option, index) => {
+                    if (index === 0) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    const optionGym = option.dataset.gimnasio || '';
+                    const visible = gimnasioId !== '' && optionGym === gimnasioId;
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+                });
+
+                if (select.selectedIndex > 0 && select.options[select.selectedIndex]?.disabled) {
+                    select.value = '';
+                }
+            });
+        };
+
+        if (motivoIngreso) {
+            motivoIngreso.addEventListener('change', function() {
+                var otroDiv = document.getElementById('divOtro');
+                var otroLabel = otroDiv.querySelector('label');
+                var otroInput = otroDiv.querySelector('input');
+                if (this.options[this.selectedIndex].text === 'Otro') {
+                    otroDiv.style.display = 'block';
+                    otroLabel.style.display = 'block';
+                    otroInput.setAttribute('required', 'required');
+                } else {
+                    otroDiv.style.display = 'none';
+                    otroLabel.style.display = 'none';
+                    otroInput.removeAttribute('required');
+                    otroInput.value = '';
+                }
+            });
+        }
+
+        if (gimnasioSelect) {
+            gimnasioSelect.addEventListener('change', filtrarOpcionesPorGimnasio);
+            filtrarOpcionesPorGimnasio();
         }
     });
 </script>

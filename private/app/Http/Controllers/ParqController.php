@@ -30,7 +30,7 @@ class ParqController extends Controller
             ]);
         }
 
-        return redirect()->route('clientes.opciones.portada', $cliente->slug)
+        return redirect()->route('clientes.agenda', $cliente->slug)
             ->with('success', 'Cuestionario PAR-Q registrado correctamente.');
     }
 

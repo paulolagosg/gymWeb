@@ -32,15 +32,29 @@
                         </div>
                         <div class="mb-4">
                             <label for="titulo" class="block text-gray-700">Título Profesional u Otro</label>
-                            <input type="text" name="titulo" id="titulo" value="{{ old('titulo') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                            <input type="text" name="titulo" id="titulo" value="{{ old('titulo') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                         <div class="mb-4">
                             <label for="email" class="block text-gray-700">Email</label>
                             <input type="email" name="email" id="email" value="{{ old('email') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
                         </div>
                         <div class="mb-4">
-                            <label for="porcentaje" class="block text-gray-700">Porcentaje Comisión</label>
-                            <input type="number" name="porcentaje" id="porcentaje" value="{{ old('porcentaje') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                            <label for="id_tipo_usuario" class="block text-gray-700">Tipo de Usuario</label>
+                            <select name="id_tipo_usuario" id="id_tipo_usuario" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                                <option value="">Seleccione un tipo de usuario</option>
+                                @foreach($tipos_usuarios as $tipoUsuario)
+                                <option value="{{ $tipoUsuario->id }}" {{ old('id_tipo_usuario') == $tipoUsuario->id ? 'selected' : '' }}>{{ $tipoUsuario->nombre }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="id_gimnasio" class="block text-gray-700">Gimnasio</label>
+                            <select name="id_gimnasio" id="id_gimnasio" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                                <option value="">Seleccione un gimnasio</option>
+                                @foreach($gimnasios as $gimnasio)
+                                <option value="{{ $gimnasio->id }}" {{ old('id_gimnasio', session('id_gimnasio_actual')) == $gimnasio->id ? 'selected' : '' }}>{{ $gimnasio->nombre }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="mb-4">
                             <label for="password" class="block text-gray-700">Contraseña</label>

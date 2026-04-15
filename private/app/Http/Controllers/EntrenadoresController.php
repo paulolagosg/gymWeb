@@ -6,27 +6,54 @@ use App\Models\Agendas;
 use App\Models\ClasificacionesEntrenadores;
 use App\Models\Clientes;
 use App\Models\EncuestaSatisfaccion;
+use App\Models\Gimnasios;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class EntrenadoresController extends Controller
 {
+    private function abortUnlessAdmin(): void
+    {
+        if (!Auth::check() || !in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true)) {
+            abort(403, 'No tiene acceso');
+        }
+    }
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $this->abortUnlessAdmin();
+        $esSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin
+            ? ($request->filled('id_gimnasio') ? (int) $request->input('id_gimnasio') : null)
+            : Gimnasios::gimnasioActualId();
+        $gimnasios = Gimnasios::where('estado', 1)->orderBy('nombre')->get();
+        $gimnasioSeleccionado = $idGimnasio;
+
         $entrenadores = \App\Models\User::where('id_tipo_usuario', 2)
-            ->with(['clientesActivos'])
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
+            ->with(['gimnasio', 'clientesActivos' => function ($query) use ($idGimnasio) {
+                if ($idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                }
+            }])
             ->get();
 
-        return view('entrenadores.index', compact('entrenadores'));
+        return view('entrenadores.index', compact('entrenadores', 'gimnasios', 'gimnasioSeleccionado'));
     }
 
     public function portada_opciones($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $userId = $entrenador->id;
 
         $fechaActual = Carbon::now()->toDateString();
@@ -80,13 +107,20 @@ class EntrenadoresController extends Controller
 
     public function sesiones_semana($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $userId = $entrenador->id;
 
         $agendas = Agendas::selectRaw(
             "DATE_FORMAT(MIN(DATE(fecha_inicio)),'%d/%m/%Y') as fecha_inicio_semana, 
     COUNT(*) as total"
         )
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
             ->where('id_usuario', $userId)
             ->groupByRaw('YEARWEEK(fecha_inicio, 1)')
             ->orderBy('fecha_inicio_semana', 'desc')
@@ -97,7 +131,11 @@ class EntrenadoresController extends Controller
 
     public function clientes($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $userId = $entrenador->id;
 
         //clientes por entrenador
@@ -137,9 +175,14 @@ class EntrenadoresController extends Controller
         });
 
         // Obtenemos todos los entrenadores
+        $idGimnasio = Gimnasios::gimnasioActualId();
+
         $entrenadores = DB::table('users')
             ->where('id_tipo_usuario', 2) // Solo entrenadores
             ->where('slug', $slug) // Filtrar por slug del entrenador
+            ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                $query->where('id_gimnasio', $idGimnasio);
+            })
             ->whereIn('id', function ($query) {
                 $query->select('id_usuario')->from('clientes');
             })
@@ -157,6 +200,9 @@ class EntrenadoresController extends Controller
                 // Clientes activos hasta fin de mes
                 $clientesAcumulados = DB::table('clientes')
                     ->where('id_usuario', $id_entrenador)
+                    ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                        $query->where('id_gimnasio', $idGimnasio);
+                    })
                     ->where('fecha_ingreso', '<=', $finMes)
                     ->where(function ($q) use ($finMes) {
                         $q->whereNull('fecha_baja')
@@ -167,6 +213,9 @@ class EntrenadoresController extends Controller
                 // Clientes nuevos en el mes
                 $clientesNuevos = DB::table('clientes')
                     ->where('id_usuario', $id_entrenador)
+                    ->when($idGimnasio, function ($query) use ($idGimnasio) {
+                        $query->where('id_gimnasio', $idGimnasio);
+                    })
                     ->where('estado', 1)
                     ->whereBetween('fecha_ingreso', [
                         Carbon::createFromFormat('Y-m', $mes)->startOfMonth()->toDateString(),
@@ -188,7 +237,11 @@ class EntrenadoresController extends Controller
 
     public function retencion($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $userId = $entrenador->id;
         $fechaInicio = '2025-01-01';
         $datos = $this->evolucionRetencionPorMes($fechaInicio, $userId);
@@ -211,7 +264,10 @@ class EntrenadoresController extends Controller
             $finMes = $inicio->copy()->endOfMonth();
             DB::enableQueryLog();
             // Clientes que ingresaron antes o durante este mes y estaban activos al inicio del mes
-            $query = Clientes::where('fecha_ingreso', '<=', $finMes);
+            $query = Clientes::where('fecha_ingreso', '<=', $finMes)
+                ->when(Gimnasios::gimnasioActualId(), function ($query, $idGimnasio) {
+                    $query->where('id_gimnasio', $idGimnasio);
+                });
 
             //if (is_null($clientesIniciales)) {
             // Para el primer mes, todos los que ingresaron hasta esa fecha y no se dieron de baja
@@ -257,7 +313,11 @@ class EntrenadoresController extends Controller
 
     public function cursos($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $cursos = \App\Models\EntrenadoresCursos::where('id_entrenador', $entrenador->id)
             ->select(
                 'curso',
@@ -273,7 +333,11 @@ class EntrenadoresController extends Controller
 
     public function resumen_entrenador($slug)
     {
-        $entrenador = \App\Models\User::where('slug', $slug)->firstOrFail();
+        $this->abortUnlessAdmin();
+        $idGimnasio = Gimnasios::gimnasioActualId();
+        $entrenador = \App\Models\User::when($idGimnasio, function ($query) use ($idGimnasio) {
+            $query->where('id_gimnasio', $idGimnasio);
+        })->where('slug', $slug)->firstOrFail();
         $userId = $entrenador->id;
         $retencion = $this->evolucionRetencionPorMes('2025-01-01', $userId);
         $clientes_activos = $entrenador->clientesActivos()->count();
