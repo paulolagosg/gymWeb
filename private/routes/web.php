@@ -20,13 +20,13 @@ Route::get('/', function () {
 
 // El hosting de producción enruta absolutamente toda petición a través de Laravel
 // (confirmado: ni siquiera un .php suelto en la raíz se sirve directo — el servidor
-// web no hace bypass de archivos estáticos como asume Laravel/Vite por defecto).
-// Por eso el CSS/JS compilado (normalmente servido directo por Apache) necesita una
-// ruta explícita que lo entregue desde acá.
-Route::get('/build/{path}', function (string $path) {
-    $file = public_path('build/' . $path);
+// web no hace bypass de archivos estáticos como asume Laravel/Vite por defecto). Por
+// eso cualquier archivo estático servido normalmente por Apache (CSS/JS compilado,
+// imágenes) necesita una ruta explícita en Laravel que lo entregue desde acá.
+$serveStaticAsset = function (string $baseDir, string $path) {
+    $file = public_path($baseDir . '/' . $path);
 
-    abort_unless(is_file($file) && str_starts_with(realpath($file), realpath(public_path('build'))), 404);
+    abort_unless(is_file($file) && str_starts_with(realpath($file), realpath(public_path($baseDir))), 404);
 
     // response()->file() adivina el Content-Type con el fileinfo de PHP, que en este
     // servidor devuelve "text/plain" para .css — el navegador descarga el archivo bien
@@ -51,7 +51,15 @@ Route::get('/build/{path}', function (string $path) {
         'Content-Type' => $mimeTypes[$extension] ?? 'application/octet-stream',
         'Cache-Control' => 'public, max-age=31536000, immutable',
     ]);
-})->where('path', '.*')->name('build.asset');
+};
+
+Route::get('/build/{path}', fn (string $path) => $serveStaticAsset('build', $path))
+    ->where('path', '.*')->name('build.asset');
+
+// Capturas reales de la app para la landing page (public/screenshots/, NO dentro de
+// public/build/ a propósito: Vite borra el contenido de build/ en cada compilación).
+Route::get('/screenshots/{path}', fn (string $path) => $serveStaticAsset('screenshots', $path))
+    ->where('path', '.*')->name('screenshots.asset');
 
 // Página intermedia para el enlace de recuperación de clave enviado por correo
 // a la app móvil: los clientes de correo (Gmail, etc.) eliminan los enlaces con

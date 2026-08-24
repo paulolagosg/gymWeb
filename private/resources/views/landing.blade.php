@@ -116,6 +116,7 @@
             <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
                 <a href="#funcionalidades" class="hover:text-gray-900">Funcionalidades</a>
                 <a href="#planes" class="hover:text-gray-900">Planes</a>
+                <a href="#contacto" class="hover:text-gray-900">Contacto</a>
             </nav>
             <a href="{{ route('login') }}"
                 class="btn-primary text-white text-sm font-semibold py-2 px-5 rounded-lg">
@@ -150,51 +151,11 @@
                 </div>
             </div>
 
-            <!-- Mockup ilustrativo de la app -->
+            <!-- Captura real de la app -->
             <div class="flex justify-center lg:justify-end">
                 <div class="phone-frame w-64">
-                    <div class="phone-screen p-4 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-[11px] text-gray-400">Hola,</p>
-                                <p class="text-sm font-bold text-gray-900">Javiera</p>
-                            </div>
-                            <div class="w-8 h-8 rounded-full bg-brand-soft"></div>
-                        </div>
-
-                        <div class="bg-white rounded-xl p-3 shadow-sm flex items-center gap-3">
-                            <div class="w-12 h-12 rounded-full ring-progress flex items-center justify-center">
-                                <div class="w-9 h-9 rounded-full bg-white flex items-center justify-center text-[10px] font-bold text-brand">
-                                    70%
-                                </div>
-                            </div>
-                            <div>
-                                <p class="text-[11px] text-gray-500">Progreso semanal</p>
-                                <p class="text-xs font-bold text-gray-900">5 de 7 sesiones</p>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-xl p-3 shadow-sm">
-                            <p class="text-[11px] text-gray-500 mb-1">Racha de entrenamiento 🔥</p>
-                            <div class="flex items-center gap-1">
-                                @for ($i = 0; $i < 7; $i++)
-                                <div class="flex-1 h-1.5 rounded-full {{ $i < 5 ? 'bg-[var(--primary)]' : 'bg-gray-200' }}"></div>
-                                @endfor
-                            </div>
-                            <p class="text-[10px] text-gray-400 mt-1">12 días seguidos</p>
-                        </div>
-
-                        <div class="bg-white rounded-xl p-3 shadow-sm">
-                            <p class="text-[11px] text-gray-500 mb-1">Próxima sesión</p>
-                            <p class="text-xs font-bold text-gray-900">Hoy · 18:30</p>
-                            <p class="text-[11px] text-gray-500">Piernas y core</p>
-                        </div>
-
-                        <div class="bg-brand-soft rounded-xl p-3 flex items-center justify-between">
-                            <span class="text-[11px] font-semibold text-brand-dark" style="color: var(--primary-dark)">Cuenta corriente</span>
-                            <span class="text-[11px] font-bold text-emerald-600">Al día</span>
-                        </div>
-                    </div>
+                    <img src="/screenshots/portada-cliente.png" alt="Portada del cliente en Ampaya"
+                        class="phone-screen w-full block">
                 </div>
             </div>
         </div>
@@ -247,9 +208,9 @@
                     'desc' => 'Cliente, entrenador y administrador, cada uno con su propia vista desde el celular — sin confundir permisos ni pantallas.',
                 ],
                 [
-                    'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2M5 21h2m0 0h10M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 6v-3a1 1 0 011-1h0a1 1 0 011 1v3',
-                    'title' => 'Multi-gimnasio',
-                    'desc' => 'Administra uno o varios gimnasios desde la misma cuenta, cada uno con sus propios colores y funcionalidades activadas.',
+                    'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
+                    'title' => 'Beneficios y convenios',
+                    'desc' => 'Catálogo de descuentos en tiendas y servicios aliados, disponible para tus clientes directo en la app.',
                 ],
                 [
                     'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -271,6 +232,38 @@
             </div>
             @endforeach
 
+        </div>
+    </section>
+
+    <!-- Galería de capturas reales -->
+    <section class="bg-white py-20">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <span class="text-brand text-xs font-bold uppercase tracking-wide">Así se ve por dentro</span>
+                <h2 class="mt-2 text-2xl md:text-3xl font-extrabold text-gray-900">Capturas reales de la app</h2>
+                <p class="mt-3 text-gray-600 max-w-xl mx-auto">Sin maquetas — así se ve Ampaya funcionando hoy.</p>
+            </div>
+
+            @php
+            $screenshots = [
+                ['file' => 'dashboard.png', 'label' => 'Dashboard del entrenador'],
+                ['file' => 'cuenta-corriente.png', 'label' => 'Cuenta corriente'],
+                ['file' => 'agenda.png', 'label' => 'Agenda'],
+                ['file' => 'calendario.png', 'label' => 'Calendario con grilla horaria'],
+                ['file' => 'evaluacion-inicial.png', 'label' => 'Evaluación inicial'],
+            ];
+            @endphp
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 items-start">
+                @foreach ($screenshots as $s)
+                <div class="text-center">
+                    <div class="phone-frame w-full max-w-[160px] mx-auto">
+                        <img src="/screenshots/{{ $s['file'] }}" alt="{{ $s['label'] }}" class="phone-screen w-full block">
+                    </div>
+                    <p class="mt-3 text-xs font-medium text-gray-600">{{ $s['label'] }}</p>
+                </div>
+                @endforeach
+            </div>
         </div>
     </section>
 
@@ -328,6 +321,39 @@
         </div>
     </section>
 
+    <!-- Contacto -->
+    <section id="contacto" class="max-w-4xl mx-auto px-6 py-20 scroll-mt-20 text-center">
+        <span class="text-brand text-xs font-bold uppercase tracking-wide">Contacto</span>
+        <h2 class="mt-2 text-2xl md:text-3xl font-extrabold text-gray-900">¿Quieres llevar Ampaya a tu gimnasio?</h2>
+        <p class="mt-3 text-gray-600 max-w-lg mx-auto">Escríbenos o llámanos y te ayudamos a partir.</p>
+
+        <div class="mt-10 flex flex-col sm:flex-row gap-6 justify-center">
+            <a href="mailto:contacto@ampaya.cl" class="card-hover flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-6 sm:w-72">
+                <div class="feature-icon w-12 h-12 rounded-lg flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <p class="text-xs text-gray-500">Correo</p>
+                    <p class="font-semibold text-gray-900">contacto@ampaya.cl</p>
+                </div>
+            </a>
+
+            <a href="tel:+56992803469" class="card-hover flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-6 sm:w-72">
+                <div class="feature-icon w-12 h-12 rounded-lg flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <p class="text-xs text-gray-500">Teléfono / WhatsApp</p>
+                    <p class="font-semibold text-gray-900">+56 9 9280 3469</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
     <!-- CTA final -->
     <section class="hero-gradient">
         <div class="max-w-4xl mx-auto px-6 py-16 text-center">
@@ -359,8 +385,10 @@
                 </ul>
             </div>
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Cuenta</p>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Contacto</p>
                 <ul class="space-y-2 text-sm text-gray-600">
+                    <li><a href="mailto:contacto@ampaya.cl" class="hover:text-gray-900">contacto@ampaya.cl</a></li>
+                    <li><a href="tel:+56992803469" class="hover:text-gray-900">+56 9 9280 3469</a></li>
                     <li><a href="{{ route('login') }}" class="hover:text-gray-900">Iniciar sesión</a></li>
                 </ul>
             </div>
