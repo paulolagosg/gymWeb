@@ -18,6 +18,21 @@ Route::get('/', function () {
     return view('landing');
 });
 
+// El hosting de producción enruta absolutamente toda petición a través de Laravel
+// (confirmado: ni siquiera un .php suelto en la raíz se sirve directo — el servidor
+// web no hace bypass de archivos estáticos como asume Laravel/Vite por defecto).
+// Por eso el CSS/JS compilado (normalmente servido directo por Apache) necesita una
+// ruta explícita que lo entregue desde acá.
+Route::get('/build/{path}', function (string $path) {
+    $file = public_path('build/' . $path);
+
+    abort_unless(is_file($file) && str_starts_with(realpath($file), realpath(public_path('build'))), 404);
+
+    return response()->file($file, [
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+    ]);
+})->where('path', '.*')->name('build.asset');
+
 // Página intermedia para el enlace de recuperación de clave enviado por correo
 // a la app móvil: los clientes de correo (Gmail, etc.) eliminan los enlaces con
 // esquemas personalizados (gym.ampaya.cl://...) de los botones, así que el

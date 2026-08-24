@@ -63,10 +63,16 @@ fi
 
 # public/build (CSS/JS compilado por Vite/Tailwind) está en .gitignore a propósito
 # (es un artefacto generado, no código fuente) — así que git nunca lo lleva al
-# servidor. Hay que compilarlo aquí y copiarlo aparte, con rsync directo, o el
-# servidor queda sirviendo un CSS viejo que no conoce las clases de Tailwind usadas
-# en cambios recientes (pasó con la landing page: el layout se veía roto porque el
-# CSS desplegado no tenía las clases nuevas compiladas).
+# servidor. Hay que compilarlo aquí y copiarlo aparte, con rsync directo.
+#
+# Este hosting enruta TODA petición a través de Laravel, sin excepción — ni siquiera
+# un archivo suelto existente en el disco se sirve directo (confirmado con una prueba:
+# un .php de diagnóstico en la raíz también devolvió el 404 de Laravel). No hay bypass
+# de archivos estáticos a nivel de servidor, así que copiar a una carpeta "build/" al
+# nivel del document root no sirve de nada. La solución fue agregar una ruta explícita
+# en Laravel (`Route::get('/build/{path}', ...)`, routes/web.php) que entrega el
+# archivo desde public_path('build/...') — por eso ahora basta con UNA sola copia, a
+# la ubicación estándar de Laravel.
 echo "==> Compilando CSS/JS (npm run build)"
 (cd private && npm run build)
 
@@ -79,6 +85,14 @@ rsync -a private/public/build/ "${SSH_TARGET}:${REMOTE_PATH}/public/build/"
 echo "==> Desplegando en el servidor"
 ssh "$SSH_TARGET" "REMOTE_PATH='$REMOTE_PATH' REMOTE_STAGING='$REMOTE_STAGING' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
+
+# Una sesión SSH no interactiva (como esta) no carga .bashrc/.bash_profile, que es
+# donde el hosting suele agregar composer al PATH — sin esto, "composer" no se
+# encuentra aunque funcione perfecto cuando te conectas a mano. El "|| true" es
+# necesario porque set -e cortaría el script si el archivo no existe.
+[ -f ~/.bash_profile ] && source ~/.bash_profile || true
+[ -f ~/.bashrc ] && source ~/.bashrc || true
+[ -f ~/.profile ] && source ~/.profile || true
 
 echo "--- git pull en el staging"
 cd "$REMOTE_STAGING"
