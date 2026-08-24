@@ -28,7 +28,27 @@ Route::get('/build/{path}', function (string $path) {
 
     abort_unless(is_file($file) && str_starts_with(realpath($file), realpath(public_path('build'))), 404);
 
+    // response()->file() adivina el Content-Type con el fileinfo de PHP, que en este
+    // servidor devuelve "text/plain" para .css — el navegador descarga el archivo bien
+    // pero se niega a aplicarlo como hoja de estilos (así se manifestó: la página cargaba
+    // sin ningún estilo de Tailwind). Se fuerza el tipo a mano según la extensión.
+    $mimeTypes = [
+        'css' => 'text/css; charset=UTF-8',
+        'js' => 'text/javascript; charset=UTF-8',
+        'json' => 'application/json',
+        'map' => 'application/json',
+        'svg' => 'image/svg+xml',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf' => 'font/ttf',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+    ];
+    $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
     return response()->file($file, [
+        'Content-Type' => $mimeTypes[$extension] ?? 'application/octet-stream',
         'Cache-Control' => 'public, max-age=31536000, immutable',
     ]);
 })->where('path', '.*')->name('build.asset');
