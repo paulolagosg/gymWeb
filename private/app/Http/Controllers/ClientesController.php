@@ -12,6 +12,7 @@ use App\Models\IMCS;
 use App\Models\Planes;
 use App\Models\User;
 use App\Rules\RutChileno;
+use App\Services\Clientes\ClienteLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use \App\Models\Perimetro;
 
 
@@ -247,8 +249,7 @@ class ClientesController extends Controller
             ->select('clientes.*', 'tu.nombre as tipo_usuario')
             ->when($idGimnasio, function ($subQuery) use ($idGimnasio) {
                 $subQuery->where('clientes.id_gimnasio', $idGimnasio);
-            })
-            ->where('clientes.estado', 1);
+            });
 
         if ((int) $usuario->id_tipo_usuario === 2) {
             $query->where('clientes.id_usuario', $usuario->id);
@@ -259,6 +260,10 @@ class ClientesController extends Controller
         $fechaActual = Carbon::now()->toDateString();
 
         $clientesMorosos = $clientes->filter(function ($cliente) use ($fechaActual) {
+            if ((int) $cliente->getRawOriginal('estado') !== 1) {
+                return false;
+            }
+
             return $cliente->cuotas->contains(function ($cuota) use ($fechaActual) {
                 return $cuota->monto_pagado < $cuota->monto_pagar &&
                     $cuota->fecha_vencimiento <= $fechaActual;
@@ -331,7 +336,11 @@ class ClientesController extends Controller
             })
             ->orderBy('nombre', 'asc')
             ->get();
-        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get();
+        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)
+            ->whereIn('id', [4, 5])
+            ->orderByRaw('CASE WHEN id = 5 THEN 1 ELSE 0 END')
+            ->orderBy('id')
+            ->get();
         $motivos = \App\Models\Motivos::where('estado', 1)->where('tipo', 1)->orderBy('nombre', 'asc')->get();
 
         if (in_array((int) $usuario->id_tipo_usuario, [1, 10], true)) {
@@ -353,29 +362,33 @@ class ClientesController extends Controller
         return view('clientes.create', compact('generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos', 'gimnasios', 'idGimnasio'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ClienteLifecycleService $clienteLifecycleService)
     {
+        $usuarioActual = Auth::user();
+        if (!in_array((int) $usuarioActual->id_tipo_usuario, [1, 2, 10], true)) {
+            abort(403, 'No tienes permiso para crear clientes.');
+        }
+
         try {
             DB::beginTransaction();
-            $usuarioActual = Auth::user();
             $esSuperAdmin = (int) $usuarioActual->id_tipo_usuario === 10;
+            $esEntrenador = (int) $usuarioActual->id_tipo_usuario === 2;
             $validatedData = $request->validate([
                 'nombres' => 'required|string|max:255',
                 'paterno' => 'required|string|max:255',
                 'materno' => 'nullable|string|max:255',
                 'id_plan' => 'required|exists:planes,id',
-                'email' => 'nullable|email|unique:clientes,email',
+                'email' => ['required', 'email', 'max:255', 'unique:clientes,email', 'unique:users,email'],
                 'fecha_nacimiento' => 'nullable|date_format:Y-m-d',
-                'ci' => 'nullable|string|max:20|unique:clientes,ci',
-                new RutChileno,
-                'telefono' => 'nullable|string|max:15',
+                'ci' => ['required', 'string', 'max:20', 'unique:clientes,ci', new RutChileno],
+                'telefono' => 'required|string|max:15',
                 'id_genero' => 'required|exists:generos,id',
                 'direccion' => 'nullable|string|max:255',
                 'ciudad' => 'nullable|string|max:100',
-                'estado' => 'required|integer',
+                'estado' => 'nullable|integer',
                 'descuento' => 'nullable|numeric|min:0',
-                'id_usuario' => 'required|exists:users,id',
-                'id_tipo_usuario' => 'required|exists:tipos_usuarios,id',
+                'id_usuario' => ['bail', 'required', 'exists:users,id'],
+                'id_tipo_usuario' => ['bail', 'required', 'exists:tipos_usuarios,id', Rule::in([4, 5])],
                 'id_gimnasio' => ($esSuperAdmin ? 'required' : 'nullable') . '|exists:gimnasios,id',
                 'altura' => 'nullable|numeric|min:0',
                 'fecha_vencimiento' => 'required|date_format:Y-m-d',
@@ -384,6 +397,13 @@ class ClientesController extends Controller
                 'id_motivo_ingreso' => 'required|exists:motivos,id',
                 'otro_ingreso' => 'nullable|string|max:100',
                 'perfil' => 'nullable|string',
+            ], [
+                'ci.required' => 'La cédula de identidad es obligatoria.',
+                'telefono.required' => 'El teléfono es obligatorio.',
+                'email.required' => 'El correo electrónico es obligatorio.',
+                'id_usuario.required' => 'Debe seleccionar un entrenador.',
+                'id_tipo_usuario.required' => 'Debe seleccionar el tipo de cliente.',
+                'id_gimnasio.required' => 'Debe seleccionar un gimnasio.',
             ]);
             $idGimnasio = $esSuperAdmin
                 ? (int) $validatedData['id_gimnasio']
@@ -409,6 +429,11 @@ class ClientesController extends Controller
             $validatedData['fecha_ingreso'] = $validatedData['fecha_registro'];
             $validatedData['fecha_pago'] = $validatedData['fecha_vencimiento'];
             $validatedData['id_gimnasio'] = $idGimnasio;
+            $validatedData['estado'] = 1;
+
+            if ($esEntrenador) {
+                $validatedData['id_usuario'] = (int) $usuarioActual->id;
+            }
 
             // Convertir a objetos Carbon para manipulación
             $fechaInicio = Carbon::parse($validatedData['fecha_registro']);
@@ -457,20 +482,8 @@ class ClientesController extends Controller
                 ]);
             }
 
-            $hash = hash('sha256', $validatedData['ci'] . config('app.key'));
-            $pwd = substr($hash, 0, 8);
-            $validatedDataUser['name'] = $validatedData['nombres'] . " " . $validatedData['paterno'] . " " . $validatedData['materno'];
-            $validatedDataUser['email'] = $validatedData['email'];
-            $validatedDataUser['password'] = bcrypt($pwd); // Usar CI como contraseña
-            $validatedDataUser['id_tipo_usuario'] = $validatedData['id_tipo_usuario'];
-            $validatedDataUser['porcentaje'] = 0; // Porcentaje opcional, entre 0 y 100
-            $validatedDataUser['estado'] = 1; // Asignar el estado del usuario
-            $validatedDataUser['id_cliente'] = $cliente->id; // Asociar el usuario al cliente
-            $validatedDataUser['id_gimnasio'] = $validatedData['id_gimnasio'];
-            // Crear el usuario asociado al cliente
-            User::create($validatedDataUser);
-
-            Mail::to($cliente->email)->send(new BienvenidaClienteMail($cliente, $pwd));
+            $clienteLifecycleService->createAccessUserForCliente($cliente, (int) $validatedData['id_tipo_usuario']);
+            $clienteLifecycleService->sendActivationWelcomeEmail($cliente);
 
             DB::commit();
             return redirect()->route('clientes.index')->with('success', 'Cliente creado exitosamente.');
@@ -498,7 +511,11 @@ class ClientesController extends Controller
             ->when(! $esSuperAdmin && $gymObjetivo, function ($query) use ($gymObjetivo) {
                 $query->where('id_gimnasio', $gymObjetivo);
             })->get();
-        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)->whereRaw('id in (3,4)')->get();
+        $tipos_usuarios = \App\Models\TiposUsuarios::where('estado', 1)
+            ->whereIn('id', [4, 5])
+            ->orderByRaw('CASE WHEN id = 5 THEN 1 ELSE 0 END')
+            ->orderBy('id')
+            ->get();
         $motivos = \App\Models\Motivos::where('estado', 1)->where('tipo', 2)->orderBy('nombre', 'asc')->get(); // Obtener motivos de ingreso activos
         $motivosi = \App\Models\Motivos::where('estado', 1)->where('tipo', 1)->orderBy('nombre', 'asc')->get(); // Obtener motivos de ingreso activos
         $clientes_duos = Clientes::join('planes', 'clientes.id_plan', 'planes.id')
@@ -533,31 +550,47 @@ class ClientesController extends Controller
         }
         return view('clientes.edit', compact('cliente', 'generos', 'planes', 'usuarios', 'tipos_usuarios', 'motivos', 'motivosi', 'clientes_duos', 'gimnasios'));
     }
-    public function update(Request $request, $slug)
+    public function update(Request $request, $slug, ClienteLifecycleService $clienteLifecycleService)
     {
         $usuarioActual = Auth::user();
         $esSuperAdmin = (int) $usuarioActual->id_tipo_usuario === 10;
+        $esEntrenador = (int) $usuarioActual->id_tipo_usuario === 2;
         $idGimnasio = $esSuperAdmin ? null : Gimnasios::gimnasioActualId();
         $cliente = \App\Models\Clientes::with('plan')
             ->when($idGimnasio, function ($query) use ($idGimnasio) {
                 $query->where('id_gimnasio', $idGimnasio);
             })->where('slug', $slug)->firstOrFail();
+        $estadoAnterior = (int) $cliente->getRawOriginal('estado');
+        $usuarioCliente = User::where('id_cliente', $cliente->id)->first();
 
         $validatedData = $request->validate([
-            'ci' => 'nullable|string|max:255',
+            'ci' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('clientes', 'ci')->ignore($cliente->id),
+                new RutChileno,
+            ],
             'nombres' => 'required|string|max:255',
             'paterno' => 'required|string|max:255',
             'materno' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:clientes,email,' . $cliente->id,
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('clientes', 'email')->ignore($cliente->id),
+                Rule::unique('users', 'email')->ignore($usuarioCliente?->id),
+            ],
+            'id_genero' => 'required|exists:generos,id',
             'id_plan' => 'required|exists:planes,id',
-            'id_usuario' => 'required|exists:users,id',
-            'id_tipo_usuario' => 'required|exists:tipos_usuarios,id',
-            'id_gimnasio' => 'nullable|exists:gimnasios,id',
-            'telefono' => 'nullable|string|max:15',
+            'id_usuario' => ['bail', 'required', 'exists:users,id'],
+            'id_tipo_usuario' => ['bail', 'required', 'exists:tipos_usuarios,id', Rule::in([4, 5])],
+            'id_gimnasio' => ($esSuperAdmin ? 'required' : 'nullable') . '|exists:gimnasios,id',
+            'telefono' => 'required|string|max:15',
             'direccion' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date_format:Y-m-d',
             'fecha_ingreso' => 'required|date_format:Y-m-d',
             'fecha_fin' => 'required|date_format:Y-m-d',
+            'fecha_vencimiento' => 'required|date_format:Y-m-d',
             'estado' => 'required|integer',
             'altura' => 'nullable|numeric|min:0',
             'id_motivo_egreso' => 'nullable|exists:motivos,id',
@@ -567,20 +600,30 @@ class ClientesController extends Controller
             'perfil' => 'nullable|string',
             'id_cliente_duo' => 'nullable|exists:clientes,id',
         ], [
+            'ci.required' => 'La cédula de identidad es obligatoria',
+            'ci.unique' => 'La cédula de identidad ya está registrada',
             'nombres.required' => 'El nombre es obligatorio',
             'nombres.max' => 'El nombre no debe exceder los 255 caracteres',
             'paterno.required' => 'El apellido paterno es obligatorio',
             'email.required' => 'El correo electrónico es requerido',
             'email.email' => 'Debe ingresar un correo electrónico válido',
             'email.unique' => 'Este correo electrónico ya está registrado',
+            'id_genero.required' => 'Debe seleccionar el género del cliente',
             'id_plan.required' => 'Debe seleccionar un plan',
             'id_plan.exists' => 'El plan seleccionado no es válido',
             'id_usuario.required' => 'Debe seleccionar un entrenador',
             'telefono.required' => 'El teléfono es obligatorio',
-            'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria',
+            'id_tipo_usuario.required' => 'Debe seleccionar el tipo de cliente',
+            'id_gimnasio.required' => 'Debe seleccionar un gimnasio',
+            'fecha_vencimiento.required' => 'Debe indicar la fecha de vencimiento',
             'estado.required' => 'Debe especificar el estado del cliente',
             'estado.integer' => 'El estado debe ser un valor numérico',
         ]);
+
+        if ($esEntrenador && array_key_exists('estado', $validatedData) && (int) $validatedData['estado'] !== $estadoAnterior) {
+            return redirect()->back()->withErrors(['estado' => 'Solo el administrador o el super administrador pueden activar o dar de baja clientes.'])->withInput($request->all());
+        }
+
         $gymObjetivo = $esSuperAdmin
             ? (int) ($validatedData['id_gimnasio'] ?? $cliente->id_gimnasio)
             : ($cliente->id_gimnasio ?: Gimnasios::gimnasioActualId());
@@ -603,11 +646,12 @@ class ClientesController extends Controller
         $fechaHoy = date('YmdHis');
 
         $validatedData['slug'] = hash('sha256', $cliente->ci . $fechaHoy);
+        $validatedData['fecha_pago'] = $validatedData['fecha_vencimiento'];
+        unset($validatedData['fecha_vencimiento']);
         $validatedData['id_gimnasio'] = $gymObjetivo;
 
         $cliente->update($validatedData);
 
-        $usuarioCliente = User::where('id_cliente', $cliente->id)->first();
         if ($usuarioCliente) {
             $usuarioCliente->update([
                 'name' => trim(($validatedData['nombres'] ?? '') . ' ' . ($validatedData['paterno'] ?? '') . ' ' . ($validatedData['materno'] ?? '')),
@@ -615,6 +659,16 @@ class ClientesController extends Controller
                 'id_tipo_usuario' => (int) $validatedData['id_tipo_usuario'],
                 'id_gimnasio' => $validatedData['id_gimnasio'],
             ]);
+        } else {
+            $clienteLifecycleService->createAccessUserForCliente($cliente->fresh(), (int) $validatedData['id_tipo_usuario']);
+        }
+
+        $cliente->refresh();
+        $estadoActual = (int) $cliente->getRawOriginal('estado');
+
+        if ($estadoAnterior !== 1 && $estadoActual === 1) {
+            $clienteLifecycleService->sendActivationWelcomeEmail($cliente);
+            $clienteLifecycleService->notifyClienteActivated($cliente, $usuarioActual);
         }
 
         return redirect()->route('clientes.index')->with('success', 'Cliente actualizado exitosamente.');
@@ -666,12 +720,34 @@ class ClientesController extends Controller
 
         return redirect()->route('clientes.index')->with('success', 'Cliente eliminado exitosamente.');
     }
-    public function toggleStatus($id)
+    public function toggleStatus($id, ClienteLifecycleService $clienteLifecycleService)
     {
-        $cliente = \App\Models\Clientes::findOrFail($id);
-        $cliente->estado = !$cliente->estado; // Cambiar el estado
-        $cliente->fecha_baja = $cliente->estado ? null : Carbon::now(); // Actualizar fecha de baja si se inactiva
+        $usuarioActual = Auth::user();
+        if (! in_array((int) $usuarioActual->id_tipo_usuario, [1, 10], true)) {
+            abort(403, 'No tienes permiso para cambiar el estado del cliente.');
+        }
+
+        $cliente = \App\Models\Clientes::query()
+            ->where(function ($query) use ($id) {
+                $query->where('slug', $id);
+
+                if (ctype_digit((string) $id)) {
+                    $query->orWhere('id', (int) $id);
+                }
+            })
+            ->firstOrFail();
+
+        $estadoAnterior = (int) $cliente->getRawOriginal('estado');
+        $nuevoEstado = $estadoAnterior === 1 ? 0 : 1;
+
+        $cliente->estado = $nuevoEstado;
+        $cliente->fecha_baja = $nuevoEstado === 1 ? null : Carbon::now();
         $cliente->save();
+
+        if ($estadoAnterior !== 1 && $nuevoEstado === 1) {
+            $clienteLifecycleService->sendActivationWelcomeEmail($cliente);
+            $clienteLifecycleService->notifyClienteActivated($cliente, $usuarioActual);
+        }
 
         return redirect()->route('clientes.index')->with('success', 'Estado del cliente actualizado exitosamente.');
     }
@@ -856,6 +932,7 @@ class ClientesController extends Controller
         foreach ($cuotas as $cuota) {
             $cuota->update([
                 'monto_pagado' => $cuota->monto_pagar,
+                'saldo' => 0,
                 'fecha_pago' => now(),
                 'id_estado_pago' => 2, // Pagada
                 'id_forma_pago' => $request->id_forma_pago,
@@ -1482,6 +1559,13 @@ class ClientesController extends Controller
     public function enviarReporte(Request $request, $slug)
     {
         $cliente = \App\Models\Clientes::where('slug', $slug)->firstOrFail();
+        $this->generarYEnviarReportePdf($cliente);
+
+        return back()->with('success', 'Reporte enviado correctamente.');
+    }
+
+    public function generarYEnviarReportePdf(Clientes $cliente): void
+    {
         // Repite la carga de datos igual que en reporte()
         $pesos = $cliente->pesos()->orderBy('created_at')->get();
         $imcs = $cliente->imcs()->orderBy('created_at')->get();
@@ -1786,11 +1870,9 @@ class ClientesController extends Controller
 
         // Envía el PDF por correo
         Mail::to($cliente->email)->send(new \App\Mail\ReporteCliente($cliente, $pdf->output()));
-
-        return back()->with('success', 'Reporte enviado correctamente.');
     }
 
-    public function ejecutarRecordatorio($slug)
+    public function ejecutarRecordatorio($slug, ClienteLifecycleService $clienteLifecycleService)
     {
         $cliente = Clientes::where('slug', $slug)->firstOrFail();
         $fechaActual = Carbon::now()->toDateString();
@@ -1805,6 +1887,11 @@ class ClientesController extends Controller
         if ($cuotasVencidas->isNotEmpty()) {
             // Enviar correo
             Mail::to($cliente->email)->send(new RecordatorioCuotasVencidas($cliente, $cuotasVencidas));
+
+            $actor = Auth::user();
+            if ($actor) {
+                $clienteLifecycleService->notifyMorosidadReminderSent($cliente, $actor, $cuotasVencidas->count());
+            }
 
             return back()->with('success', 'Recordatorio enviado con éxito.');
         }
@@ -1880,7 +1967,7 @@ class ClientesController extends Controller
                 $usuario->email = $cliente->email;
             }
             $usuario->save();
-            Mail::to($cliente->email)->send(new BienvenidaClienteMail($cliente, $pwd));
+            Mail::to($cliente->email)->send(new BienvenidaClienteMail($cliente, $pwd, true, ClienteLifecycleService::APP_DOWNLOAD_URL));
         }
 
         echo $nCorreos . " Correos enviados correctamente.";

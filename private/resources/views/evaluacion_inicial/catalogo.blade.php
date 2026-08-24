@@ -34,7 +34,22 @@
                 </div>
 
                 <div class="p-6 space-y-6">
+                    @php
+                    $tiposTextoLibre = ['texto', 'textarea', 'numero', 'fecha', 'text'];
+                    @endphp
                     @foreach($seccion->preguntas as $pregunta)
+                    @php
+                    $esTextoLibre = in_array($pregunta->tipo, $tiposTextoLibre, true);
+                    $etiquetaTipo = match ($pregunta->tipo) {
+                        'multiple' => 'Selección múltiple',
+                        'unica', 'single' => 'Selección única',
+                        'si_no' => 'Sí / No',
+                        'escala' => 'Escala',
+                        'numero' => 'Número',
+                        'fecha' => 'Fecha',
+                        default => 'Texto libre',
+                    };
+                    @endphp
                     <div class="rounded-lg border border-gray-200 p-5 space-y-4">
                         <form method="POST" action="{{ route('evaluacion-inicial.preguntas.update', $pregunta) }}" class="space-y-4">
                             @csrf
@@ -46,7 +61,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                                    <input type="text" value="{{ $pregunta->tipo === 'multiple' ? 'Selección múltiple' : ($pregunta->tipo === 'single' ? 'Selección única' : 'Texto libre') }}" class="w-full rounded-md border-gray-200 bg-gray-100 text-gray-600" disabled>
+                                    <input type="text" value="{{ $etiquetaTipo }}" class="w-full rounded-md border-gray-200 bg-gray-100 text-gray-600" disabled>
                                 </div>
                             </div>
 
@@ -79,7 +94,7 @@
                             </div>
                         </form>
 
-                        @if($pregunta->tipo !== 'text')
+                        @if(! $esTextoLibre)
                         <div class="space-y-3 border-t border-gray-200 pt-4">
                             <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Opciones</h3>
 

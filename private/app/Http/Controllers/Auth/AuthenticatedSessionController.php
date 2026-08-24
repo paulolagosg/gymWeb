@@ -38,7 +38,7 @@ class AuthenticatedSessionController extends Controller
             $request->session()->put('perfil_actual', Auth::user()->id_tipo_usuario);
         }
 
-        $redirectRoute = Auth::check() && in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true)
+        $redirectRoute = Auth::check() && in_array((int) Auth::user()->id_tipo_usuario, [1, 2, 10], true)
             ? 'dashboard'
             : 'portada';
 

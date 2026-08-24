@@ -1,23 +1,27 @@
-@component('mail::message')
-# ¡Hola {{ $cliente->nombres }}!
+@extends('emails.layout')
 
-Te recordamos que tienes cuotas vencidas pendientes de pago.
+@section('subject', 'Cuotas vencidas - ' . $brand['display_name'])
+@section('title', 'Hola ' . $cliente->nombres . '!')
 
-**Detalles de pagos pendientes:**
+@section('content')
+<p style="margin:0 0 14px;">Te recordamos que tienes cuotas vencidas pendientes de pago.</p>
 
-@foreach($cuotasVencidas as $cuota)
-**Fecha de vencimiento:** {{ \Carbon\Carbon::parse($cuota->fecha_vencimiento)->format('d/m/Y') }}
-**Monto a pagar:** ${{ number_format($cuota->monto_pagar, 0, ',', '.') }}
+<div style="margin:0 0 18px; padding:14px 16px; border-radius:16px; background-color:{{ $brand['soft_color'] }}; border-left:4px solid {{ $brand['primary_color'] }};">
+    <strong>Debes ${{ number_format($montoTotal, 0, ',', '.') }}</strong> desde hace {{ $diasDesde }} {{ $diasDesde == 1 ? 'día' : 'días' }}.
+</div>
 
-@endforeach
+<div style="margin:0 0 18px; padding:14px 16px; border-radius:16px; background-color:#f9fafb; border:1px solid #e5e7eb;">
+    @foreach($cuotasVencidas as $cuota)
+    <div style="{{ !$loop->first ? 'margin-top:12px; padding-top:12px; border-top:1px solid #e5e7eb;' : '' }}">
+        <strong>Fecha de vencimiento:</strong> {{ \Carbon\Carbon::parse($cuota->fecha_vencimiento)->format('d/m/Y') }}<br>
+        <strong>Monto pendiente:</strong> ${{ number_format($cuota->saldo ?? $cuota->monto_pagar, 0, ',', '.') }}
+    </div>
+    @endforeach
+</div>
 
-**Formas de pago aceptadas:**
-Efectivo, Transferencia electrónica, Tarjeta de crédito/débito.
+<p style="margin:0 0 14px;"><strong>Formas de pago aceptadas:</strong> Efectivo, transferencia electrónica, tarjeta de crédito y débito.</p>
 
-@component('mail::panel')
-Si ya has realizado el pago, por favor ignora este mensaje. Si tienes alguna duda o necesitas asistencia, no dudes en contactarnos.
-@endcomponent
-
-Saludos cordiales,<br>
-**Equipo Ampaya Gym**
-@endcomponent
+<div style="padding:14px 16px; border-radius:16px; background-color:{{ $brand['soft_color'] }}; border-left:4px solid {{ $brand['primary_color'] }};">
+    Si ya realizaste el pago, puedes ignorar este mensaje. Si necesitas ayuda, contáctanos y te apoyaremos.
+</div>
+@endsection

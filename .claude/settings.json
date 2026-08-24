@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker info *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}

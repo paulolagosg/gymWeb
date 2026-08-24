@@ -1,6 +1,7 @@
 <x-admin-layout>
     @php($isAdminLike = in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true))
     @php($isSuperAdmin = (int) Auth::user()->id_tipo_usuario === 10)
+    @php($lockedTrainerId = (int) Auth::user()->id_tipo_usuario === 2 ? Auth::user()->id : $cliente->id_usuario)
     <div class="py-4">
         <div class="">
             <div class="flex items-center justify-between mb-4 bg-white p-6 rounded-lg">
@@ -33,6 +34,9 @@
                         </ul>
                     </div>
                     @endif
+                    <div class="mx-4 my-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                        Al guardar tambien se sincroniza el usuario asociado del cliente: nombre, correo, tipo cliente y gimnasio. La clave se sigue gestionando automaticamente fuera de este formulario.
+                    </div>
                     <form action="{{ route('clientes.update', $cliente->slug) }}" method="POST" class="space-y-4">
                         @csrf
                         @method('PUT')
@@ -46,7 +50,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                             <div class="mb-4 sm:mb-0">
                                 <label for="ci" class="block text-sm font-medium text-gray-700">Cédula de Identidad</label>
-                                <input type="text" name="ci" id="ci" value="{{ old('ci', $cliente->ci) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <input type="text" name="ci" id="ci" value="{{ old('ci', $cliente->ci) }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="nombres" class="block text-sm font-medium text-gray-700">Nombres</label>
@@ -63,12 +67,23 @@
                                 <input type="text" name="materno" id="materno" value="{{ old('materno', $cliente->materno) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
+                                <label for="id_genero" class="block text-sm font-medium text-gray-700">Género</label>
+                                <select name="id_genero" id="id_genero" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    <option value="">Seleccionar genero</option>
+                                    @foreach ($generos as $genero)
+                                    <option value="{{ $genero->id }}" {{ (string) old('id_genero', $cliente->id_genero) === (string) $genero->id ? 'selected' : '' }}>
+                                        {{ $genero->nombre }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="mb-4 sm:mb-0">
                                 <label for="telefono" class="block text-sm font-medium text-gray-700">Teléfono</label>
-                                <input type="text" name="telefono" id="telefono" value="{{ old('telefono', $cliente->telefono) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <input type="text" name="telefono" id="telefono" value="{{ old('telefono', $cliente->telefono) }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                                <input type="email" name="email" id="email" value="{{ old('email', $cliente->email) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <input type="email" name="email" id="email" value="{{ old('email', $cliente->email) }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="fecha_nacimiento" class="block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
@@ -83,6 +98,10 @@
                                 <input type="date" name="fecha_fin" id="fecha_fin" value="{{ old('fecha_fin', $cliente->fecha_fin) }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
+                                <label for="fecha_vencimiento" class="block text-sm font-medium text-gray-700">Fecha de Vencimiento</label>
+                                <input type="date" name="fecha_vencimiento" id="fecha_vencimiento" value="{{ old('fecha_vencimiento', $cliente->fecha_pago) }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="mb-4 sm:mb-0">
                                 <label for="altura" class="block text-sm font-medium text-gray-700">Altura</label>
                                 <input type="text" name="altura" id="altura" value="{{ old('altura', $cliente->altura) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
@@ -93,7 +112,7 @@
                             @if($isSuperAdmin)
                             <div class="mb-4 sm:mb-0">
                                 <label for="id_gimnasio" class="block text-sm font-medium text-gray-700">Gimnasio</label>
-                                <select name="id_gimnasio" id="id_gimnasio" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <select name="id_gimnasio" id="id_gimnasio" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                     @foreach ($gimnasios as $gimnasio)
                                     <option value="{{ $gimnasio->id }}" {{ (string) old('id_gimnasio', $cliente->id_gimnasio) === (string) $gimnasio->id ? 'selected' : '' }}>
                                         {{ $gimnasio->nombre }}
@@ -144,8 +163,11 @@
                                     @endforeach
                                 </select>
                                 @if(!$isAdminLike)
-                                <input type="hidden" name="id_usuario" value="{{ Auth::user()->id }}">
+                                <input type="hidden" name="id_usuario" value="{{ $lockedTrainerId }}">
                                 @endif
+                                <p id="id_usuario_help" class="mt-1 text-xs text-gray-500">
+                                    Selecciona el entrenador responsable del cliente.
+                                </p>
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">¿Cómo llegó al gimnasio?</label>
@@ -168,7 +190,7 @@
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="id_tipo_usuario" class="block text-sm font-medium text-gray-700">Tipo Cliente</label>
-                                <select name="id_tipo_usuario" id="id_tipo_usuario" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" @if(!$isAdminLike) disabled @endif>
+                                <select name="id_tipo_usuario" id="id_tipo_usuario" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" @if(!$isAdminLike) disabled @endif>
                                     @foreach ($tipos_usuarios as $tu)
                                     <option value="{{ $tu->id }}" {{ (string) old('id_tipo_usuario', optional($cliente->user)->id_tipo_usuario) === (string) $tu->id ? 'selected' : '' }}>
                                         {{ $tu->nombre }}
@@ -181,7 +203,7 @@
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="id_plan" class="block text-sm font-medium text-gray-700">Estado</label>
-                                <select name="estado" id="estado"
+                                <select name="estado" id="estado" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                     @if(!$isAdminLike) disabled @endif>
                                     <option value="1" {{ old('estado') == '1' ? 'selected' : '' }} {{ $cliente->estado == 'Activo' ? 'selected' : '' }}>Activo</option>
@@ -208,6 +230,27 @@
                                 <label for="otro_egreso" class="block text-sm font-medium text-gray-700" style="display:none">¿Cuál?</label>
                                 <input type="text" name="otro_egreso" id="otro_egreso" value="{{ old('otro_egreso',$cliente->otro_egreso) }}"
                                     class="w-full mt-1 block border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+                            <h3 class="text-sm font-semibold text-slate-800">Resumen de usuario asociado</h3>
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="usuario_name_preview" class="block text-sm font-medium text-gray-700">Nombre de acceso</label>
+                                    <input type="text" id="usuario_name_preview" readonly
+                                        value="{{ trim(implode(' ', array_filter([old('nombres', $cliente->nombres), old('paterno', $cliente->paterno), old('materno', $cliente->materno)]))) }}"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="usuario_email_preview" class="block text-sm font-medium text-gray-700">Correo de acceso</label>
+                                    <input type="text" id="usuario_email_preview" readonly value="{{ old('email', $cliente->email) }}"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="usuario_password_preview" class="block text-sm font-medium text-gray-700">Clave inicial</label>
+                                    <input type="text" id="usuario_password_preview" readonly value="Gestionada automáticamente"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
                             </div>
                         </div>
                         <div class="flex justify-start mt-6">
@@ -265,6 +308,27 @@
 
         var planSelect = document.getElementById('id_plan');
         var gimnasioSelect = document.getElementById('id_gimnasio');
+        var entrenadorHelp = document.getElementById('id_usuario_help');
+        var nombresInput = document.getElementById('nombres');
+        var paternoInput = document.getElementById('paterno');
+        var maternoInput = document.getElementById('materno');
+        var emailInput = document.getElementById('email');
+        var usuarioNamePreview = document.getElementById('usuario_name_preview');
+        var usuarioEmailPreview = document.getElementById('usuario_email_preview');
+
+        function actualizarResumenUsuario() {
+            if (usuarioNamePreview) {
+                usuarioNamePreview.value = [
+                    nombresInput?.value || '',
+                    paternoInput?.value || '',
+                    maternoInput?.value || '',
+                ].filter(Boolean).join(' ').trim();
+            }
+
+            if (usuarioEmailPreview) {
+                usuarioEmailPreview.value = emailInput?.value || '';
+            }
+        }
 
         function filtrarOpcionesPorGimnasio() {
             if (!gimnasioSelect) {
@@ -295,6 +359,23 @@
                 }
             });
 
+            if (entrenadorHelp) {
+                var entrenadorSelect = document.getElementById('id_usuario');
+                var trainersDisponibles = entrenadorSelect ?
+                    Array.from(entrenadorSelect.options).filter(function(option, index) {
+                        return index > 0 && !option.disabled;
+                    }) :
+                    [];
+
+                if (!gimnasioId) {
+                    entrenadorHelp.textContent = 'Selecciona primero un gimnasio para ver entrenadores disponibles.';
+                } else if (trainersDisponibles.length === 0) {
+                    entrenadorHelp.textContent = 'No hay entrenadores disponibles para el gimnasio seleccionado.';
+                } else {
+                    entrenadorHelp.textContent = 'Selecciona el entrenador responsable del cliente.';
+                }
+            }
+
             activarDuo();
         }
 
@@ -304,6 +385,14 @@
         } else {
             activarDuo();
         }
+
+        [nombresInput, paternoInput, maternoInput, emailInput].forEach(function(input) {
+            if (input) {
+                input.addEventListener('input', actualizarResumenUsuario);
+            }
+        });
+
+        actualizarResumenUsuario();
     });
 
     document.getElementById('estado').addEventListener('change', function() {

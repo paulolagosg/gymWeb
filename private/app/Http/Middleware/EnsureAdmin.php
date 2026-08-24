@@ -13,7 +13,7 @@ class EnsureAdmin
         /** @var \App\Models\User|null $user */
         $user = $request->user();
 
-        if (! $user || $user->id_tipo_usuario !== 1) {
+        if (! $user || ! in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
             return response()->json(['message' => 'No autorizado.'], 403);
         }
 

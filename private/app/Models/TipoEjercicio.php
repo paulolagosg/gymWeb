@@ -10,11 +10,17 @@ class TipoEjercicio extends Model
 
     protected $fillable = [
         'nombre',
-        'icono'
+        'icono',
+        'id_grupo',
     ];
 
     public function ejercicios()
     {
         return $this->hasMany(Ejercicios::class, 'id_tipo');
+    }
+
+    public function grupoMuscular()
+    {
+        return $this->belongsTo(GrupoMuscular::class, 'id_grupo');
     }
 }

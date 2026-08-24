@@ -196,9 +196,11 @@ class AdminController extends Controller
             ->select(
                 'clientes.*',
                 'planes.nombre as plan_nombre',
-                'planes.valor as plan_valor'
+                'planes.valor as plan_valor',
+                'generos.nombre as genero_nombre'
             )
             ->leftJoin('planes', 'clientes.id_plan', '=', 'planes.id')
+            ->leftJoin('generos', 'clientes.id_genero', '=', 'generos.id')
             ->where('clientes.slug', $slug)
             ->first();
 
@@ -261,11 +263,17 @@ class AdminController extends Controller
                 'ciudad'             => $cliente->ciudad,
                 'direccion'          => $cliente->direccion,
                 'fecha_nacimiento'   => $cliente->fecha_nacimiento,
+                'id_genero'          => $cliente->id_genero,
+                'genero'             => $cliente->genero_nombre,
                 'id_usuario'         => $cliente->id_usuario,
                 'id_motivo_ingreso'  => $cliente->id_motivo_ingreso,
                 'id_motivo_egreso'   => $cliente->id_motivo_egreso,
                 'perfil'             => $cliente->perfil,
                 'moroso'             => $moroso,
+                'foto_path'          => $cliente->foto_path ?? null,
+                'foto_url'           => $cliente->foto_path ? asset('storage/' . $cliente->foto_path) : null,
+                'avatar_url'         => $cliente->foto_path ? asset('storage/' . $cliente->foto_path) : null,
+                'image_url'          => $cliente->foto_path ? asset('storage/' . $cliente->foto_path) : null,
             ],
             'ultimo_peso'  => $ultimoPeso ? (float) $ultimoPeso->peso : null,
             'ultimo_imc'   => $ultimoImc ? (float) $ultimoImc->imc : null,
@@ -299,6 +307,7 @@ class AdminController extends Controller
             'fecha_fin'          => 'nullable|date',
             'altura'             => 'nullable|numeric|min:0.5|max:2.5',
             'estado'             => 'nullable|integer|in:0,1',
+            'id_genero'          => 'nullable|integer|exists:generos,id',
             'id_plan'            => 'nullable|integer|exists:planes,id',
             'id_usuario'         => 'nullable|integer|exists:users,id',
             'id_motivo_ingreso'  => 'nullable|integer|exists:motivos,id',
@@ -311,8 +320,9 @@ class AdminController extends Controller
             ->update(array_merge($validated, ['updated_at' => now()]));
 
         $updated = DB::table('clientes')
-            ->select('clientes.*', 'planes.nombre as plan_nombre')
+            ->select('clientes.*', 'planes.nombre as plan_nombre', 'generos.nombre as genero_nombre')
             ->leftJoin('planes', 'clientes.id_plan', '=', 'planes.id')
+            ->leftJoin('generos', 'clientes.id_genero', '=', 'generos.id')
             ->where('clientes.slug', $slug)
             ->first();
 
@@ -320,6 +330,30 @@ class AdminController extends Controller
             'message' => 'Cliente actualizado correctamente.',
             'cliente' => $updated,
         ]);
+    }
+
+    /**
+     * Detalle de un cliente por ID numérico.
+     */
+    public function clienteDetalleById(Request $request, int $id): JsonResponse
+    {
+        $cliente = DB::table('clientes')->where('id', $id)->first();
+        if (! $cliente) {
+            return response()->json(['message' => 'Cliente no encontrado.'], 404);
+        }
+        return $this->clienteDetalle($request, $cliente->slug);
+    }
+
+    /**
+     * Actualizar datos de un cliente por ID numérico.
+     */
+    public function updateClienteById(Request $request, int $id): JsonResponse
+    {
+        $cliente = DB::table('clientes')->where('id', $id)->first();
+        if (! $cliente) {
+            return response()->json(['message' => 'Cliente no encontrado.'], 404);
+        }
+        return $this->updateCliente($request, $cliente->slug);
     }
 
     /**
@@ -585,7 +619,7 @@ class AdminController extends Controller
         $agendaSlots = [];
         switch ($recurrencia) {
             case 'mensual':
-                $limite = $fechaInicio->copy()->endOfMonth();
+                $limite = $fechaInicio->copy()->addMonth()->subDay();
                 $cursor = $fechaInicio->copy();
                 while ($cursor->lte($limite)) {
                     if ($cursor->gte($fechaInicio) && in_array($cursor->dayOfWeek, $diasSemana, true)) {
@@ -598,8 +632,7 @@ class AdminController extends Controller
                 }
                 break;
             case 'trimestral':
-                $mesInicioTrimestre = intval(($fechaInicio->month - 1) / 3) * 3 + 1;
-                $limite = $fechaInicio->copy()->month($mesInicioTrimestre)->startOfMonth()->addMonths(3)->subDay();
+                $limite = $fechaInicio->copy()->addMonths(3)->subDay();
                 $cursor = $fechaInicio->copy();
                 while ($cursor->lte($limite)) {
                     if ($cursor->gte($fechaInicio) && in_array($cursor->dayOfWeek, $diasSemana, true)) {
@@ -612,8 +645,7 @@ class AdminController extends Controller
                 }
                 break;
             case 'semestral':
-                $mesInicioSemestre = $fechaInicio->month <= 6 ? 1 : 7;
-                $limite = $fechaInicio->copy()->month($mesInicioSemestre)->startOfMonth()->addMonths(6)->subDay();
+                $limite = $fechaInicio->copy()->addMonths(6)->subDay();
                 $cursor = $fechaInicio->copy();
                 while ($cursor->lte($limite)) {
                     if ($cursor->gte($fechaInicio) && in_array($cursor->dayOfWeek, $diasSemana, true)) {
@@ -626,7 +658,7 @@ class AdminController extends Controller
                 }
                 break;
             case 'anual':
-                $limite = $fechaInicio->copy()->endOfYear();
+                $limite = $fechaInicio->copy()->addYear()->subDay();
                 $cursor = $fechaInicio->copy();
                 while ($cursor->lte($limite)) {
                     if ($cursor->gte($fechaInicio) && in_array($cursor->dayOfWeek, $diasSemana, true)) {
@@ -665,16 +697,17 @@ class AdminController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                $rows = array_map(fn($ejercicio) => [
+                $rows = array_map(fn($ejercicio, $indice) => [
                     'id_agenda' => $agendaId,
                     'id_ejercicio' => $ejercicio['id_ejercicio'],
+                    'orden' => $indice,
                     'serie' => $ejercicio['serie'],
                     'repeticiones' => $ejercicio['repeticiones'],
                     'carga' => $ejercicio['carga'] ?? null,
                     'descanso' => $ejercicio['descanso'] ?? null,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ], $validated['ejercicios']);
+                ], $validated['ejercicios'], array_keys($validated['ejercicios']));
 
                 DB::table('agendas_ejercicios')->insert($rows);
                 $agendaIds[] = (int) $agendaId;

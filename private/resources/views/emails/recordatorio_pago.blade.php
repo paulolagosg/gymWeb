@@ -1,19 +1,18 @@
-@component('mail::message')
-# ¡Hola {{ $cliente->nombres }}!
+@extends('emails.layout')
 
-Te recordamos que tu próxima cuota vence en **3 días ({{ \Carbon\Carbon::parse($datosPago['fecha_vencimiento'])->format('d/m/Y') }})**.
+@section('subject', 'Recordatorio de pago - ' . $brand['display_name'])
+@section('title', 'Hola ' . $cliente->nombres . '!')
 
-**Detalles del pago pendiente:**
+@section('content')
+<p style="margin:0 0 14px;">Te recordamos que tu próxima cuota vence en <strong>3 días ({{ \Carbon\Carbon::parse($datosPago['fecha_vencimiento'])->format('d/m/Y') }})</strong>.</p>
 
-- **Fecha de vencimiento:** {{ \Carbon\Carbon::parse($datosPago['fecha_vencimiento'])->format('d/m/Y') }}
-- **Monto a pagar:** ${{ number_format($datosPago['monto_pagar'], 0, ',', '.') }}
-- **Formas de pago aceptadas:** Efectivo, Transferencia electrónica, Tarjeta de crédito/débito.
+<div style="margin:0 0 18px; padding:14px 16px; border-radius:16px; background-color:#f9fafb; border:1px solid #e5e7eb;">
+    <strong>Fecha de vencimiento:</strong> {{ \Carbon\Carbon::parse($datosPago['fecha_vencimiento'])->format('d/m/Y') }}<br>
+    <strong>Monto a pagar:</strong> ${{ number_format($datosPago['monto_pagar'], 0, ',', '.') }}<br>
+    <strong>Formas de pago:</strong> Efectivo, transferencia electrónica, tarjeta de crédito y débito.
+</div>
 
-
-@component('mail::panel')
-Si ya has realizado el pago, por favor ignora este mensaje. Si tienes alguna duda o necesitas asistencia, no dudes en contactarnos.
-@endcomponent
-
-Saludos cordiales,<br>
-**Equipo Ampaya Gym**
-@endcomponent
+<div style="padding:14px 16px; border-radius:16px; background-color:{{ $brand['soft_color'] }}; border-left:4px solid {{ $brand['primary_color'] }};">
+    Si ya realizaste el pago, puedes ignorar este mensaje. Si tienes dudas, contáctanos y te ayudaremos.
+</div>
+@endsection

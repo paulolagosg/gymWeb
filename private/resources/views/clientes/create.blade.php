@@ -12,6 +12,12 @@
                     <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-4">
                         Agregar Cliente
                     </h2>
+                    <div class="mx-4 my-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        El cliente se creara en estado inactivo. Solo el administrador o el super administrador podran activarlo, y recien en esa activacion se enviara el correo de bienvenida con acceso a la app.
+                    </div>
+                    <div class="mx-4 my-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                        Al guardar tambien se creara el usuario de acceso del cliente usando estos datos obligatorios: nombre generado desde nombres y apellidos, correo del cliente, tipo cliente, gimnasio y clave inicial automatica basada en CI/correo.
+                    </div>
                     @if(session('success'))
                     <div class="mx-4 my-2 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
                         {{ session('success') }}
@@ -57,7 +63,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                             <div class="mb-4 sm:mb-0">
                                 <label for="ci" class="block text-sm font-medium text-gray-700">Cédula de Identidad</label>
-                                <input type="text" name="ci" id="ci" value="{{ old('ci') }}"
+                                <input type="text" name="ci" id="ci" value="{{ old('ci') }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4">
@@ -79,12 +85,12 @@
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                                <input type="email" name="email" id="email" value="{{ old('email') }}"
+                                <input type="email" name="email" id="email" value="{{ old('email') }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
                                 <label for="telefono" class="block text-sm font-medium text-gray-700">Teléfono</label>
-                                <input type="text" name="telefono" id="telefono" value="{{ old('telefono') }}"
+                                <input type="text" name="telefono" id="telefono" value="{{ old('telefono') }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
@@ -147,20 +153,23 @@
                                     </option>
                                     @endforeach
                                 </select>
+                                <p id="id_usuario_help" class="mt-1 text-xs text-gray-500">
+                                    Selecciona el entrenador responsable del cliente.
+                                </p>
                             </div>
                             <div class="mb-4">
                                 <label for="fecha_registro" class="block text-sm font-medium text-gray-700">Fecha de Inicio</label>
-                                <input type="date" name="fecha_registro" id="fecha_registro" value="{{ old('fecha_registro', now()->format('Y-m-d')) }}"
+                                <input type="date" name="fecha_registro" id="fecha_registro" value="{{ old('fecha_registro', now()->format('Y-m-d')) }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4">
                                 <label for="fecha_fin" class="block text-sm font-medium text-gray-700">Fecha de Fin</label>
-                                <input type="date" name="fecha_fin" id="fecha_fin" value="{{ old('fecha_fin', now()->format('Y-m-d')) }}"
+                                <input type="date" name="fecha_fin" id="fecha_fin" value="{{ old('fecha_fin', now()->format('Y-m-d')) }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4">
                                 <label for="fecha_vencimiento" class="block text-sm font-medium text-gray-700">Fecha de Vencimiento</label>
-                                <input type="date" name="fecha_vencimiento" id="fecha_vencimiento" value="{{ old('fecha_vencimiento ', now()->format('Y-m-d')) }}"
+                                <input type="date" name="fecha_vencimiento" id="fecha_vencimiento" value="{{ old('fecha_vencimiento', now()->format('Y-m-d')) }}" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
 
@@ -184,28 +193,47 @@
                             </div>
                             <div class="mb-4 sm:mb-0" style="display:none" id="divOtro">
                                 <label for="otro_ingreso" class="block text-sm font-medium text-gray-700" style="display:none">¿Cuál?</label>
-                                <input type="text" name="otro_ingreso" id="otro_ingreso" value="{{ old('altura') }}"
+                                <input type="text" name="otro_ingreso" id="otro_ingreso" value="{{ old('otro_ingreso') }}"
                                     class="w-full mt-1 block border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             </div>
                             <div class="mb-4 sm:mb-0">
-                                <label for="tipo_cliente" class="block text-sm font-medium text-gray-700">Tipo Cliente</label>
+                                <label for="id_tipo_usuario" class="block text-sm font-medium text-gray-700">Tipo Cliente</label>
                                 <select name="id_tipo_usuario" id="id_tipo_usuario" required
                                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                    <option value="">Seleccionar tipo</option>
-                                    @foreach ($tipos_usuarios as $tu)
-                                    <option value="{{ $tu->id }}" {{ old('id_tipo_usuario') == $tu->id ? 'selected' : '' }}>
+                                    @foreach($tipos_usuarios as $tu)
+                                    <option value="{{ $tu->id }}" {{ (string) old('id_tipo_usuario', $tipos_usuarios->first()->id ?? 4) === (string) $tu->id ? 'selected' : '' }}>
                                         {{ $tu->nombre }}
                                     </option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="mb-4 sm:mb-0">
-                                <label for=" estado" class="block text-sm font-medium text-gray-700">Estado</label>
-                                <select name="estado" id="estado"
-                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                    <option value="1" {{ old('estado') == '1' ? 'selected' : '' }}>Activo</option>
-                                    <option value="0" {{ old('estado') == '0' ? 'selected' : '' }}>Inactivo</option>
-                                </select>
+                                <label for="estado_preview" class="block text-sm font-medium text-gray-700">Estado inicial</label>
+                                <input id="estado_preview" type="text" value="Inactivo - pendiente de activacion" readonly
+                                    class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                <input type="hidden" name="estado" value="0">
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+                            <h3 class="text-sm font-semibold text-slate-800">Resumen de usuario asociado</h3>
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="usuario_name_preview" class="block text-sm font-medium text-gray-700">Nombre de acceso</label>
+                                    <input type="text" id="usuario_name_preview" readonly
+                                        value="{{ trim(implode(' ', array_filter([old('nombres'), old('paterno'), old('materno')]))) }}"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="usuario_email_preview" class="block text-sm font-medium text-gray-700">Correo de acceso</label>
+                                    <input type="text" id="usuario_email_preview" readonly value="{{ old('email') }}"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="usuario_password_preview" class="block text-sm font-medium text-gray-700">Clave inicial</label>
+                                    <input type="text" id="usuario_password_preview" readonly value="Se genera automáticamente"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md bg-stone-100 shadow-sm py-2 px-3 sm:text-sm">
+                                </div>
                             </div>
                         </div>
                         <span class="hidden bg-green-600 bg-green-800 hover:bg-green-800 bg-red-600 bg-red-800 hover:bg-red-800"></span>
@@ -232,6 +260,27 @@
         const gimnasioSelect = document.getElementById('id_gimnasio');
         const planSelect = document.getElementById('id_plan');
         const entrenadorSelect = document.getElementById('id_usuario');
+        const trainerHelp = document.getElementById('id_usuario_help');
+        const nombresInput = document.getElementById('nombres');
+        const paternoInput = document.getElementById('paterno');
+        const maternoInput = document.getElementById('materno');
+        const emailInput = document.getElementById('email');
+        const usuarioNamePreview = document.getElementById('usuario_name_preview');
+        const usuarioEmailPreview = document.getElementById('usuario_email_preview');
+
+        const actualizarResumenUsuario = () => {
+            if (usuarioNamePreview) {
+                usuarioNamePreview.value = [
+                    nombresInput?.value || '',
+                    paternoInput?.value || '',
+                    maternoInput?.value || '',
+                ].filter(Boolean).join(' ').trim();
+            }
+
+            if (usuarioEmailPreview) {
+                usuarioEmailPreview.value = emailInput?.value || '';
+            }
+        };
 
         const filtrarOpcionesPorGimnasio = () => {
             if (!gimnasioSelect || !planSelect || !entrenadorSelect) {
@@ -258,6 +307,18 @@
                     select.value = '';
                 }
             });
+
+            if (trainerHelp) {
+                const trainersDisponibles = Array.from(entrenadorSelect.options).filter((option, index) => index > 0 && !option.disabled);
+
+                if (!gimnasioId) {
+                    trainerHelp.textContent = 'Selecciona primero un gimnasio para ver entrenadores disponibles.';
+                } else if (trainersDisponibles.length === 0) {
+                    trainerHelp.textContent = 'No hay entrenadores disponibles para el gimnasio seleccionado.';
+                } else {
+                    trainerHelp.textContent = 'Selecciona el entrenador responsable del cliente.';
+                }
+            }
         };
 
         if (motivoIngreso) {
@@ -282,5 +343,13 @@
             gimnasioSelect.addEventListener('change', filtrarOpcionesPorGimnasio);
             filtrarOpcionesPorGimnasio();
         }
+
+        [nombresInput, paternoInput, maternoInput, emailInput].forEach((input) => {
+            if (input) {
+                input.addEventListener('input', actualizarResumenUsuario);
+            }
+        });
+
+        actualizarResumenUsuario();
     });
 </script>

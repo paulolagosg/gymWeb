@@ -11,6 +11,7 @@ class EntrenadoresCursos extends Model
     protected $fillable = [
         'id_entrenador',
         'curso',
+        'tipo',
         'fecha_inicio',
         'fecha_fin',
         'institucion',

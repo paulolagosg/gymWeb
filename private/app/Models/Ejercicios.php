@@ -26,4 +26,23 @@ class Ejercicios extends Model
     {
         return $this->belongsTo(TipoEjercicio::class, 'id_tipo');
     }
+
+    public function grupoMuscular()
+    {
+        return $this->hasOneThrough(
+            GrupoMuscular::class,
+            TipoEjercicio::class,
+            'id',
+            'id',
+            'id_tipo',
+            'id_grupo'
+        );
+    }
+
+    public function videos()
+    {
+        return $this->hasMany(EjerciciosVideos::class, 'id_ejercicio')
+            ->orderBy('orden')
+            ->orderBy('id');
+    }
 }

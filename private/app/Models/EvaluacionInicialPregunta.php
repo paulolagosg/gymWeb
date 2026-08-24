@@ -19,6 +19,9 @@ class EvaluacionInicialPregunta extends Model
         'tipo',
         'es_requerida',
         'permite_otro',
+        'es_sensible',
+        'depende_pregunta_id',
+        'depende_opcion_id',
         'orden',
         'estado',
     ];
@@ -26,6 +29,7 @@ class EvaluacionInicialPregunta extends Model
     protected $casts = [
         'es_requerida' => 'boolean',
         'permite_otro' => 'boolean',
+        'es_sensible' => 'boolean',
         'estado' => 'boolean',
     ];
 
@@ -42,5 +46,15 @@ class EvaluacionInicialPregunta extends Model
     public function respuestas()
     {
         return $this->hasMany(EvaluacionInicialRespuesta::class, 'pregunta_id');
+    }
+
+    public function dependePregunta()
+    {
+        return $this->belongsTo(EvaluacionInicialPregunta::class, 'depende_pregunta_id');
+    }
+
+    public function dependeOpcion()
+    {
+        return $this->belongsTo(EvaluacionInicialOpcion::class, 'depende_opcion_id');
     }
 }

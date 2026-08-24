@@ -17,11 +17,13 @@ class EvaluacionInicialOpcion extends Model
         'etiqueta',
         'orden',
         'es_otro',
+        'genera_alerta',
         'estado',
     ];
 
     protected $casts = [
         'es_otro' => 'boolean',
+        'genera_alerta' => 'boolean',
         'estado' => 'boolean',
     ];
 

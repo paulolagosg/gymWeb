@@ -47,6 +47,8 @@ class ConsistentTestDataSeeder extends Seeder
             }
         }
 
+        $this->seedFutureAgendasForAllClients($exerciseIds);
+        $this->seedPastAgendasForAllClients($exerciseIds);
         $this->ensureSupportUser($gyms[0]);
 
         if ($this->command) {
@@ -64,6 +66,7 @@ class ConsistentTestDataSeeder extends Seeder
                     ['id' => 2, 'nombre' => 'Entrenador', 'slug' => 'entrenador', 'descripcion' => 'Entrenador personal', 'estado' => 1],
                     ['id' => 3, 'nombre' => 'Recepcionista', 'slug' => 'recepcionista', 'descripcion' => 'Apoyo operativo', 'estado' => 1],
                     ['id' => 4, 'nombre' => 'Cliente', 'slug' => 'cliente', 'descripcion' => 'Cliente del gimnasio', 'estado' => 1],
+                    ['id' => 5, 'nombre' => 'Open Gym', 'slug' => 'open-gym', 'descripcion' => 'Cliente autoguiado', 'estado' => 1],
                     ['id' => 10, 'nombre' => 'Superadmin', 'slug' => 'superadmin', 'descripcion' => 'Administrador global', 'estado' => 1],
                 ] as $role
             ) {
@@ -479,9 +482,8 @@ class ConsistentTestDataSeeder extends Seeder
 
         for ($i = 1; $i <= $agendaCount; $i++) {
             $start = Carbon::today()
-                ->subWeeks(10)
-                ->addDays(($clientIndex * 2) + ($i * 3))
-                ->setTime(7 + (($i + $clientIndex) % 10), 0);
+                ->addDays((($i - 1) * 2) + (($clientIndex - 1) % 3))
+                ->setTime(7 + (($i + $clientIndex) % 10), ($i % 2) * 30);
             $end = $start->copy()->addHour();
             $slug = sprintf('agenda-cliente-%d-%d', $client->id, $i);
 
@@ -491,8 +493,8 @@ class ConsistentTestDataSeeder extends Seeder
                 'id_gimnasio' => $gym->id,
                 'fecha_inicio' => $start->format('Y-m-d H:i:s'),
                 'fecha_fin' => $end->format('Y-m-d H:i:s'),
-                'titulo' => "Sesión {$i} · {$client->nombres}",
-                'descripcion' => 'Sesión programada con foco progresivo y seguimiento.',
+                'titulo' => "Sesión futura {$i} · {$client->nombres}",
+                'descripcion' => 'Sesión futura programada para validación y seguimiento.',
                 'estado' => 1,
                 'slug' => $slug,
             ]);
@@ -522,6 +524,123 @@ class ConsistentTestDataSeeder extends Seeder
                     'carga' => (15 + ($exerciseOrder * 5)) . ' kg',
                     'descanso' => (60 + ($exerciseOrder * 15)) . ' s',
                 ])));
+            }
+        }
+    }
+
+    private function seedFutureAgendasForAllClients(array $exerciseIds): void
+    {
+        $clients = DB::table('clientes')
+            ->where('estado', 1)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($clients as $index => $client) {
+            $trainer = DB::table('users')
+                ->where('id', $client->id_usuario)
+                ->where('id_tipo_usuario', 2)
+                ->first();
+
+            if (! $trainer) {
+                $trainer = DB::table('users')
+                    ->where('id_tipo_usuario', 2)
+                    ->when($client->id_gimnasio, function ($query) use ($client) {
+                        $query->where('id_gimnasio', $client->id_gimnasio);
+                    })
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            $gym = DB::table('gimnasios')->where('id', $client->id_gimnasio)->first()
+                ?? Gimnasios::query()->orderBy('id')->first();
+
+            if (! $trainer || ! $gym) {
+                continue;
+            }
+
+            $this->seedAgendasForClient($client, $trainer, $gym, $exerciseIds, ($index % 10) + 1);
+        }
+    }
+
+    private function seedPastAgendasForAllClients(array $exerciseIds): void
+    {
+        $clients = DB::table('clientes')
+            ->where('estado', 1)
+            ->orderBy('id')
+            ->get();
+
+        $exercisePool = array_values($exerciseIds);
+
+        foreach ($clients as $index => $client) {
+            $trainer = DB::table('users')
+                ->where('id', $client->id_usuario)
+                ->where('id_tipo_usuario', 2)
+                ->first();
+
+            if (! $trainer) {
+                $trainer = DB::table('users')
+                    ->where('id_tipo_usuario', 2)
+                    ->when($client->id_gimnasio, function ($query) use ($client) {
+                        $query->where('id_gimnasio', $client->id_gimnasio);
+                    })
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            $gym = DB::table('gimnasios')->where('id', $client->id_gimnasio)->first()
+                ?? Gimnasios::query()->orderBy('id')->first();
+
+            if (! $trainer || ! $gym || count($exercisePool) === 0) {
+                continue;
+            }
+
+            $agendaCount = 3 + ($index % 3);
+
+            for ($i = 1; $i <= $agendaCount; $i++) {
+                $start = Carbon::today()
+                    ->subDays((($i + 1) * 4) + (($index % 4) * 2))
+                    ->setTime(7 + (($i + $index) % 10), ($i % 2) * 30);
+                $end = $start->copy()->addHour();
+                $slug = sprintf('agenda-pasada-cliente-%d-%d', $client->id, $i);
+
+                $agenda = $this->upsertRow('agendas', ['slug' => $slug], [
+                    'id_cliente' => $client->id,
+                    'id_usuario' => $trainer->id,
+                    'id_gimnasio' => $gym->id,
+                    'fecha_inicio' => $start->format('Y-m-d H:i:s'),
+                    'fecha_fin' => $end->format('Y-m-d H:i:s'),
+                    'titulo' => "Sesión realizada {$i} · {$client->nombres}",
+                    'descripcion' => 'Sesión pasada marcada como realizada para historial.',
+                    'estado' => 4,
+                    'slug' => $slug,
+                ]);
+
+                DB::table('agendas_ejercicios')->where('id_agenda', $agenda->id)->delete();
+
+                $exerciseCount = 3 + (($i + $index) % 2);
+                $startAt = ($i + $index) % count($exercisePool);
+                $selected = [];
+
+                for ($offset = 0; $offset < $exerciseCount; $offset++) {
+                    $selected[] = $exercisePool[($startAt + $offset) % count($exercisePool)];
+                }
+
+                foreach ($selected as $exerciseOrder => $exerciseId) {
+                    DB::table('agendas_ejercicios')->insert($this->withTimestamps('agendas_ejercicios', $this->filterColumns('agendas_ejercicios', [
+                        'id_agenda' => $agenda->id,
+                        'id_ejercicio' => $exerciseId,
+                        'serie' => 3 + ($exerciseOrder % 2),
+                        'repeticiones' => ['10-12', '12-15', '8-10', '30 seg'][$exerciseOrder % 4],
+                        'rir' => '2',
+                        'rpe' => '7',
+                        'rm' => 'N/A',
+                        'metodo' => 1,
+                        'progresion' => 1,
+                        'fundamento' => 'Sesión histórica consistente para validación del panel',
+                        'carga' => (15 + ($exerciseOrder * 5)) . ' kg',
+                        'descanso' => (60 + ($exerciseOrder * 15)) . ' s',
+                    ])));
+                }
             }
         }
     }

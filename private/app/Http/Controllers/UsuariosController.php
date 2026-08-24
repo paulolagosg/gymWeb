@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\BienvenidaClienteMail;
 use App\Models\Clientes;
 use App\Models\Gimnasios;
+use App\Models\Planes;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

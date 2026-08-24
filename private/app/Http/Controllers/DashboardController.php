@@ -20,11 +20,11 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        if ($user && in_array((int) $user->id_tipo_usuario, [1, 10], true)) {
+        if ($user && in_array((int) $user->id_tipo_usuario, [1, 2, 10], true)) {
             return redirect()->route('dashboard');
         }
 
-        if ($user && in_array((int) $user->id_tipo_usuario, [3, 4], true)) {
+        if ($user && in_array((int) $user->id_tipo_usuario, [3, 4, 5], true)) {
             $cliente = $user->cliente ?? Clientes::find($user->id_cliente);
 
             if ($cliente && $cliente->slug) {

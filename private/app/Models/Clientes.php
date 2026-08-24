@@ -36,7 +36,8 @@ class Clientes extends Model
         'otro_egreso',
         'perfil',
         'id_cliente_duo',
-        'id_gimnasio'
+        'id_gimnasio',
+        'foto_path',
     ];
     protected $casts = [
         'fecha_nacimiento' => 'date',
@@ -106,6 +107,23 @@ class Clientes extends Model
         return $this->belongsTo(Planes::class, 'id_plan');
     }
 
+    public function tipoUsuario()
+    {
+        return $this->hasOneThrough(
+            TiposUsuarios::class,
+            User::class,
+            'id_cliente',
+            'id',
+            'id',
+            'id_tipo_usuario'
+        );
+    }
+
+    public function tipos_usuarios()
+    {
+        return $this->tipoUsuario();
+    }
+
     public function gimnasio()
     {
         return $this->belongsTo(Gimnasios::class, 'id_gimnasio');
@@ -123,10 +141,6 @@ class Clientes extends Model
     public function imcs()
     {
         return $this->hasMany(IMCS::class, 'id_cliente');
-    }
-    public function tipos_usuarios()
-    {
-        return $this->belongsTo(TiposUsuarios::class, 'id_tipo_usuario');
     }
     public function aguas()
     {
@@ -173,5 +187,22 @@ class Clientes extends Model
     public function evaluacionInicial()
     {
         return $this->hasOne(EvaluacionInicial::class, 'id_cliente');
+    }
+
+    public function planesAlimentacion()
+    {
+        return $this->hasMany(PlanAlimentacion::class, 'id_cliente');
+    }
+
+    public function planAlimentacionActivo()
+    {
+        return $this->hasOne(PlanAlimentacion::class, 'id_cliente')
+            ->where('estado', 'activo')
+            ->latest('updated_at');
+    }
+
+    public function isOpenGym(): bool
+    {
+        return (int) optional($this->user)->id_tipo_usuario === 5;
     }
 }

@@ -39,6 +39,16 @@
                     @php
                     $respuesta = $respuestasAgrupadas[$pregunta->id] ?? ['selected_option_ids' => [], 'other_text' => null, 'text_value' => null];
                     $opcionesSeleccionadas = $pregunta->opciones->whereIn('id', $respuesta['selected_option_ids']);
+                    $esTextoLibre = in_array($pregunta->tipo, ['texto', 'textarea', 'numero', 'fecha', 'text'], true);
+                    $etiquetaTipo = match ($pregunta->tipo) {
+                        'multiple' => 'Selección múltiple',
+                        'unica', 'single' => 'Selección única',
+                        'si_no' => 'Sí / No',
+                        'escala' => 'Escala',
+                        'numero' => 'Número',
+                        'fecha' => 'Fecha',
+                        default => 'Texto libre',
+                    };
                     @endphp
                     <div class="rounded-lg border border-gray-200 p-5">
                         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -49,12 +59,12 @@
                                 @endif
                             </div>
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                {{ $pregunta->tipo === 'multiple' ? 'Selección múltiple' : ($pregunta->tipo === 'single' ? 'Selección única' : 'Texto libre') }}
+                                {{ $etiquetaTipo }}
                             </div>
                         </div>
 
                         <div class="mt-4">
-                            @if($pregunta->tipo === 'text')
+                            @if($esTextoLibre)
                             @if($respuesta['text_value'])
                             <p class="text-gray-800 whitespace-pre-line">{{ $respuesta['text_value'] }}</p>
                             @else

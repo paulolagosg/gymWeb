@@ -56,7 +56,7 @@ class EvaluacionInicialController extends Controller
     {
         $this->abortUnlessAdmin();
 
-        if ($pregunta->tipo === 'text') {
+        if (in_array($pregunta->tipo, ['texto', 'textarea', 'numero', 'fecha', 'text'], true)) {
             return redirect()
                 ->route('evaluacion-inicial.catalogo')
                 ->withErrors(['error' => 'Las preguntas de texto no aceptan opciones.']);

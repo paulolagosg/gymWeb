@@ -40,6 +40,7 @@
     2 => $trainerClassification !== '' ? $trainerClassification : 'Entrenador',
     3 => $roleNameFromRelation !== '' ? $roleNameFromRelation : 'Cliente presencial',
     4 => $roleNameFromRelation !== '' ? $roleNameFromRelation : 'Cliente online',
+    5 => $roleNameFromRelation !== '' ? $roleNameFromRelation : 'Open Gym',
     10 => $roleNameFromRelation !== '' ? $roleNameFromRelation : 'Super administrador',
     default => $roleNameFromRelation !== '' ? $roleNameFromRelation : 'Usuario',
     };
@@ -48,18 +49,33 @@
     $isSuperAdmin = (int) $currentUser->id_tipo_usuario === 10;
     $canManageAdminModules = $isAdmin || $isSuperAdmin;
     $isTrainer = (int) $currentUser->id_tipo_usuario === 2;
-    $isClient = in_array((int) $currentUser->id_tipo_usuario, [3, 4], true);
+    $isClient = in_array((int) $currentUser->id_tipo_usuario, [3, 4, 5], true);
     $canSeeOperationalModules = $canManageAdminModules || $isTrainer;
     $clientProfile = $isClient ? ($currentUser->cliente ?? \App\Models\Clientes::with('entrenador')->find($currentUser->id_cliente)) : null;
     $clientSlug = optional($clientProfile)->slug;
     $trainerSidebarSlug = optional(optional($clientProfile)->entrenador)->slug;
     $hasParq = $clientProfile ? \App\Models\ParqRespuestas::where('id_cliente', $clientProfile->id)->exists() : false;
     $hasFitPlan = $clientProfile ? \App\Models\Cuestionarios::where('id_cliente', $clientProfile->id)->exists() : false;
-    $homeRoute = ($isClient && $clientSlug)
+    $homeRoute = ((int) $currentUser->id_tipo_usuario === 5)
+    ? route('open-gym.index')
+    : (($isClient && $clientSlug)
     ? route('clientes.agenda', $clientSlug)
-    : ($canManageAdminModules ? route('dashboard') : route('portada'));
+    : (($canManageAdminModules || $isTrainer) ? route('dashboard') : route('portada')));
 
     if ($isClient && $clientSlug) {
+    if ((int) $currentUser->id_tipo_usuario === 5) {
+    $menuSections = [
+    [
+    'title' => 'Open Gym',
+    'items' => [
+    ['label' => 'Rutinas', 'route' => 'open-gym.index', 'icon' => 'fa-dumbbell', 'patterns' => ['open-gym.index', 'open-gym.create', 'open-gym.edit']],
+    ['label' => 'Progreso', 'route' => 'open-gym.progress', 'icon' => 'fa-chart-line', 'patterns' => ['open-gym.progress']],
+    ['label' => 'Historial', 'route' => 'open-gym.history', 'icon' => 'fa-clock-rotate-left', 'patterns' => ['open-gym.history', 'open-gym.workouts.*']],
+    ['label' => 'Mi perfil', 'route' => 'profile.edit', 'icon' => 'fa-user-pen', 'patterns' => ['profile.*']],
+    ],
+    ],
+    ];
+    } else {
     $menuSections = [
     [
     'title' => 'Mi espacio',
@@ -93,6 +109,7 @@
     ],
     ],
     ];
+    }
     } else {
     $menuSections = [
     [
@@ -119,6 +136,7 @@
     'items' => [
     ['label' => 'Planes', 'route' => 'planes.index', 'icon' => 'fa-layer-group', 'patterns' => ['planes.*'], 'can' => $canManageAdminModules],
     ['label' => 'Gimnasios', 'route' => 'gimnasios.index', 'icon' => 'fa-building', 'patterns' => ['gimnasios.*'], 'can' => $isSuperAdmin],
+    ['label' => 'Términos', 'route' => 'terminos.index', 'icon' => 'fa-file-contract', 'patterns' => ['terminos.*'], 'can' => $isSuperAdmin],
     ['label' => 'Usuarios', 'route' => 'usuarios.index', 'icon' => 'fa-user-gear', 'patterns' => ['usuarios.*'], 'can' => $canManageAdminModules],
     ['label' => 'Pagos entrenadores', 'route' => 'pagos_entrenadores.index', 'icon' => 'fa-money-check-dollar', 'patterns' => ['pagos_entrenadores.*'], 'can' => $isAdmin],
     ['label' => 'Evaluacion inicial', 'route' => 'evaluacion-inicial.catalogo', 'icon' => 'fa-clipboard-list', 'patterns' => ['evaluacion-inicial.*'], 'can' => $isAdmin],
@@ -170,6 +188,26 @@
                             </div>
                             <div class="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
                                 Gimnasio: {{ $gimnasioLabel }}
+                            </div>
+
+                            <div id="notifications-shell" class="relative">
+                                <button type="button" id="notifications-trigger" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:border-stone-300 hover:text-stone-950 focus:outline-none">
+                                    <i class="fa-regular fa-bell text-base"></i>
+                                    <span id="notifications-badge" class="absolute -right-1 -top-1 hidden min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white"></span>
+                                </button>
+
+                                <div id="notifications-panel" class="absolute right-0 top-14 hidden w-96 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-[0_30px_80px_rgba(0,0,0,0.18)]">
+                                    <div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-stone-900">Notificaciones</p>
+                                            <p class="text-xs text-stone-500">Avisos recientes de tu cuenta</p>
+                                        </div>
+                                        <button type="button" id="notifications-read-all" class="text-xs font-semibold text-amber-700 hover:text-amber-900">
+                                            Marcar todas como leidas
+                                        </button>
+                                    </div>
+                                    <div id="notifications-list" class="max-h-[26rem] overflow-y-auto bg-stone-50"></div>
+                                </div>
                             </div>
 
                             <x-dropdown align="right" width="56">
@@ -260,6 +298,146 @@
             } else if (typeof desktopQuery.addListener === 'function') {
                 desktopQuery.addListener(syncSidebar);
             }
+
+            const notificationsShell = document.getElementById('notifications-shell');
+            const notificationsTrigger = document.getElementById('notifications-trigger');
+            const notificationsPanel = document.getElementById('notifications-panel');
+            const notificationsBadge = document.getElementById('notifications-badge');
+            const notificationsList = document.getElementById('notifications-list');
+            const notificationsReadAll = document.getElementById('notifications-read-all');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            if (!notificationsShell || !notificationsTrigger || !notificationsPanel || !notificationsBadge || !notificationsList || !notificationsReadAll) {
+                return;
+            }
+
+            const formatDate = (value) => {
+                if (!value) return '';
+
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+
+                return new Intl.DateTimeFormat('es-CL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }).format(date);
+            };
+
+            const setBadge = (count) => {
+                if (!count) {
+                    notificationsBadge.classList.add('hidden');
+                    notificationsBadge.textContent = '';
+                    return;
+                }
+
+                notificationsBadge.classList.remove('hidden');
+                notificationsBadge.textContent = count > 99 ? '99+' : String(count);
+            };
+
+            const postNotificationAction = async (url) => {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+            };
+
+            const renderNotifications = (payload) => {
+                const items = payload?.notifications ?? [];
+                setBadge(payload?.unread_count ?? 0);
+
+                if (!items.length) {
+                    notificationsList.innerHTML = '<div class="px-4 py-8 text-center text-sm text-stone-500">No tienes notificaciones por ahora.</div>';
+                    return;
+                }
+
+                notificationsList.innerHTML = items.map((item) => {
+                    const isUnread = !item.read_at;
+                    const title = item.title ?? 'Notificacion';
+                    const message = item.message ?? '';
+                    const createdAt = formatDate(item.created_at);
+                    const unreadMarker = isUnread ? '<span class="inline-flex h-2.5 w-2.5 rounded-full bg-amber-500"></span>' : '<span class="inline-flex h-2.5 w-2.5 rounded-full bg-stone-300"></span>';
+
+                    return `
+                        <button type="button"
+                            class="notification-item flex w-full items-start gap-3 border-b border-stone-100 px-4 py-3 text-left transition hover:bg-white ${isUnread ? 'bg-white' : 'bg-stone-50'}"
+                            data-id="${item.id}"
+                            data-read-url="/notificaciones/${item.id}/leer"
+                            data-action-url="${item.action_url_web ?? ''}">
+                            <div class="mt-1">${unreadMarker}</div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="truncate text-sm font-semibold text-stone-900">${title}</p>
+                                    <span class="shrink-0 text-[11px] text-stone-400">${createdAt}</span>
+                                </div>
+                                <p class="mt-1 text-xs leading-5 text-stone-600">${message}</p>
+                            </div>
+                        </button>
+                    `;
+                }).join('');
+
+                notificationsList.querySelectorAll('.notification-item').forEach((element) => {
+                    element.addEventListener('click', async () => {
+                        const readUrl = element.getAttribute('data-read-url');
+                        const actionUrl = element.getAttribute('data-action-url');
+
+                        if (readUrl) {
+                            await postNotificationAction(readUrl);
+                        }
+
+                        if (actionUrl) {
+                            window.location.href = actionUrl;
+                            return;
+                        }
+
+                        await loadNotifications();
+                    });
+                });
+            };
+
+            const loadNotifications = async () => {
+                try {
+                    const response = await fetch('/notificaciones', {
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('No se pudieron cargar las notificaciones.');
+                    }
+
+                    renderNotifications(await response.json());
+                } catch (error) {
+                    notificationsList.innerHTML = '<div class="px-4 py-8 text-center text-sm text-red-500">No se pudieron cargar las notificaciones.</div>';
+                }
+            };
+
+            notificationsTrigger.addEventListener('click', async () => {
+                const isHidden = notificationsPanel.classList.contains('hidden');
+                notificationsPanel.classList.toggle('hidden');
+
+                if (isHidden) {
+                    await loadNotifications();
+                }
+            });
+
+            notificationsReadAll.addEventListener('click', async () => {
+                await postNotificationAction('/notificaciones/leer-todas');
+                await loadNotifications();
+            });
+
+            document.addEventListener('click', function(event) {
+                if (!notificationsShell.contains(event.target)) {
+                    notificationsPanel.classList.add('hidden');
+                }
+            });
+
+            loadNotifications();
         });
     </script>
 </body>

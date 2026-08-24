@@ -16,6 +16,7 @@ class EvaluacionInicialRespuesta extends Model
         'pregunta_id',
         'opcion_id',
         'valor_texto',
+        'id_gimnasio',
     ];
 
     public function evaluacion()

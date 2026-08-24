@@ -1,9 +1,12 @@
-<img src="https://static.wixstatic.com/media/6d10e7_ec01ef38f649435295345bd8aa178ff9~mv2.png/v1/fill/w_169,h_89,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Logo%20MAX%202023.png 1x, https://static.wixstatic.com/media/6d10e7_ec01ef38f649435295345bd8aa178ff9~mv2.png/v1/fill/w_338,h_178,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Logo%20MAX%202023.png" alt="Logo" style="max-width: 180px; margin-bottom: 16px;">
-@component('mail::message')
-# ¡Hola {{ $cliente->nombres }} {{ $cliente->paterno }} {{ $cliente->materno }}!
+@extends('emails.layout')
 
-Adjunto encontrarás un reporte de evolución en Ampaya Gym, junto con tu información financiera.
+@section('subject', 'Reporte de indicadores - ' . $brand['display_name'])
+@section('title', 'Hola ' . trim($cliente->nombres . ' ' . $cliente->paterno . ' ' . $cliente->materno) . '!')
 
-Saludos cordiales,<br>
-**Equipo Ampaya Gym**
-@endcomponent
+@section('content')
+<p style="margin:0 0 14px;">Adjunto encontrarás tu reporte de evolución, junto con la información financiera asociada a tu cuenta en {{ $brand['display_name'] }}.</p>
+
+<div style="padding:14px 16px; border-radius:16px; background-color:{{ $brand['soft_color'] }}; border-left:4px solid {{ $brand['primary_color'] }};">
+    El archivo PDF viaja adjunto en este correo para que puedas revisarlo cuando quieras.
+</div>
+@endsection

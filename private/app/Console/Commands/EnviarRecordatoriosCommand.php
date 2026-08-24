@@ -11,7 +11,7 @@ use App\Models\CuentasCorrientes;
 
 class EnviarRecordatoriosCommand extends Command
 {
-    protected $signature = 'recordatorios:enviar';
+    protected $signature = 'recordatorios:proximas';
     protected $description = 'Envía recordatorios de pagos próximos a vencer';
 
     public function handle()

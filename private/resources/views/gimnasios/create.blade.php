@@ -35,6 +35,18 @@
                         </div>
 
                         <div>
+                            <label for="color_primario" class="block text-gray-700">Color primario</label>
+                            <input type="color" id="color_primario" name="color_primario" value="{{ old('color_primario', '#489ddf') }}" class="mt-1 block h-11 w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('color_primario') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="color_secundario" class="block text-gray-700">Color secundario</label>
+                            <input type="color" id="color_secundario" name="color_secundario" value="{{ old('color_secundario', '#3f8ac4') }}" class="mt-1 block h-11 w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            @error('color_secundario') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
                             <label for="sitio_web" class="block text-gray-700">Sitio web</label>
                             <input type="url" id="sitio_web" name="sitio_web" value="{{ old('sitio_web') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
                             @error('sitio_web') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
@@ -71,6 +83,24 @@
                             <label for="descripcion" class="block text-gray-700">Descripción</label>
                             <textarea id="descripcion" name="descripcion" rows="4" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">{{ old('descripcion') }}</textarea>
                             @error('descripcion') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="email_encabezado" class="block text-gray-700">Encabezado email</label>
+                            <input type="text" id="email_encabezado" name="email_encabezado" value="{{ old('email_encabezado') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="Ej: Bienvenido a Fit Norte">
+                            @error('email_encabezado') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="email_firma" class="block text-gray-700">Firma email</label>
+                            <input type="text" id="email_firma" name="email_firma" value="{{ old('email_firma') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="Ej: Equipo Fit Norte">
+                            @error('email_firma') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="email_pie" class="block text-gray-700">Pie de página email</label>
+                            <textarea id="email_pie" name="email_pie" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="Teléfono, dirección, sitio web o mensaje institucional">{{ old('email_pie') }}</textarea>
+                            @error('email_pie') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 

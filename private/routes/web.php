@@ -5,15 +5,30 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EjerciciosController;
 use App\Http\Controllers\MensajeController;
 use App\Http\Controllers\MovimientosFinancierosController;
+use App\Http\Controllers\NotificationsController;
+use App\Http\Controllers\OpenGymWebController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EvaluacionInicialController;
 use App\Http\Controllers\GimnasiosController;
+use App\Http\Controllers\TermsAndConditionsWebController;
 use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('auth/login');
 });
+
+// Página intermedia para el enlace de recuperación de clave enviado por correo
+// a la app móvil: los clientes de correo (Gmail, etc.) eliminan los enlaces con
+// esquemas personalizados (gym.ampaya.cl://...) de los botones, así que el
+// correo enlaza a esta vista https, que redirige al esquema de la app.
+Route::get('/app/reset-password', function (\Illuminate\Http\Request $request) {
+    return view('auth.reset-password-app', [
+        'token' => (string) $request->query('token', ''),
+        'email' => (string) $request->query('email', ''),
+        'scheme' => env('APP_MOBILE_URL_SCHEME', 'gym.ampaya.cl'),
+    ]);
+})->name('app.reset-password.redirect');
 
 // Route::get('/dashboard', function () {
 //     return view('dashboard');
@@ -22,6 +37,10 @@ Route::get('/', function () {
 
 
 Route::middleware(['auth'])->group(function () {
+
+    Route::get('/notificaciones', [NotificationsController::class, 'index'])->name('notifications.index');
+    Route::post('/notificaciones/leer-todas', [NotificationsController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::post('/notificaciones/{notificationId}/leer', [NotificationsController::class, 'markAsRead'])->name('notifications.read');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/api/dashboard-data', [DashboardController::class, 'getDashboardData']);
@@ -46,6 +65,13 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/gimnasios/{slug}', [GimnasiosController::class, 'update'])->name('gimnasios.update');
     Route::delete('/gimnasios/{slug}', [GimnasiosController::class, 'destroy'])->name('gimnasios.destroy');
     Route::patch('/gimnasios/{slug}/estado', [GimnasiosController::class, 'toggleStatus'])->name('gimnasios.cambiarEstado');
+    /* terminos y condiciones */
+    Route::get('/terminos', [TermsAndConditionsWebController::class, 'index'])->name('terminos.index');
+    Route::get('/terminos/create', [TermsAndConditionsWebController::class, 'create'])->name('terminos.create');
+    Route::post('/terminos', [TermsAndConditionsWebController::class, 'store'])->name('terminos.store');
+    Route::get('/terminos/{id}/edit', [TermsAndConditionsWebController::class, 'edit'])->name('terminos.edit');
+    Route::put('/terminos/{id}', [TermsAndConditionsWebController::class, 'update'])->name('terminos.update');
+    Route::delete('/terminos/{id}', [TermsAndConditionsWebController::class, 'destroy'])->name('terminos.destroy');
     /* usuarios */
     Route::get('/usuarios', [\App\Http\Controllers\UsuariosController::class, 'index'])->name('usuarios.index');
     Route::get('/usuarios/create', [\App\Http\Controllers\UsuariosController::class, 'create'])->name('usuarios.create');
@@ -159,6 +185,20 @@ Route::middleware(['auth'])->group(function () {
 
     //agenda cliente
     Route::get('/clientes/{slug}/agenda', [\App\Http\Controllers\ClientesController::class, 'agenda'])->name('clientes.agenda');
+
+    Route::get('/open-gym', [OpenGymWebController::class, 'index'])->name('open-gym.index');
+    Route::get('/open-gym/rutinas/create', [OpenGymWebController::class, 'create'])->name('open-gym.create');
+    Route::post('/open-gym/rutinas', [OpenGymWebController::class, 'store'])->name('open-gym.store');
+    Route::get('/open-gym/rutinas/{id}/edit', [OpenGymWebController::class, 'edit'])->name('open-gym.edit');
+    Route::put('/open-gym/rutinas/{id}', [OpenGymWebController::class, 'update'])->name('open-gym.update');
+    Route::post('/open-gym/rutinas/{id}/duplicar', [OpenGymWebController::class, 'duplicate'])->name('open-gym.duplicate');
+    Route::delete('/open-gym/rutinas/{id}', [OpenGymWebController::class, 'destroy'])->name('open-gym.destroy');
+    Route::get('/open-gym/progreso', [OpenGymWebController::class, 'progress'])->name('open-gym.progress');
+    Route::get('/open-gym/historial', [OpenGymWebController::class, 'history'])->name('open-gym.history');
+    Route::post('/open-gym/entrenamientos/{routineId}', [OpenGymWebController::class, 'startWorkout'])->name('open-gym.workouts.start');
+    Route::get('/open-gym/entrenamientos/{id}/show', [OpenGymWebController::class, 'showWorkout'])->name('open-gym.workouts.show');
+    Route::put('/open-gym/entrenamientos/{id}/series/{setId}', [OpenGymWebController::class, 'updateWorkoutSet'])->name('open-gym.workouts.sets.update');
+    Route::post('/open-gym/entrenamientos/{id}/finalizar', [OpenGymWebController::class, 'finishWorkout'])->name('open-gym.workouts.finish');
 
     Route::get('/clientes/{slug}/reporte', [\App\Http\Controllers\ClientesController::class, 'reporte'])->name('clientes.reporte');
     Route::post('/clientes/{slug}/reporte/enviar', [\App\Http\Controllers\ClientesController::class, 'enviarReporte'])->name('clientes.reporte.enviar');

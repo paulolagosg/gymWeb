@@ -1,12 +1,16 @@
-@component('mail::message')
-# ¡Tienes un nuevo mensaje!
+@extends('emails.layout')
 
-Has recibido un nuevo mensaje de **{{ $remitente->name }}**.
+@section('subject', 'Nuevo mensaje - ' . $brand['display_name'])
+@section('title', 'Tienes un nuevo mensaje')
 
-@component('mail::button', ['url' => url('/mensajes')])
-Revíselo aquí
-@endcomponent
+@section('content')
+<p style="margin:0 0 14px;">Has recibido un nuevo mensaje de <strong>{{ $remitente->name }}</strong>.</p>
 
-Gracias,<br>
-{{ config('app.name') }}
-@endcomponent
+@if(!empty($mensaje->mensaje ?? null))
+<div style="margin:0 0 18px; padding:14px 16px; border-radius:16px; background-color:{{ $brand['soft_color'] }}; border-left:4px solid {{ $brand['primary_color'] }};">
+    {{ $mensaje->mensaje }}
+</div>
+@endif
+
+@include('emails.partials.button', ['url' => url('/mensajes'), 'label' => 'Revisar mensaje', 'brand' => $brand])
+@endsection

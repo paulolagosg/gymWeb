@@ -6,7 +6,7 @@ return [
     'allowed_origins' => ['http://localhost:8081', 'http://localhost:19006', 'http://127.0.0.1:8081'],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
-    'exposed_headers' => [],
+    'exposed_headers' => ['X-Request-Id'],
     'max_age' => 0,
     'supports_credentials' => false,
 ];

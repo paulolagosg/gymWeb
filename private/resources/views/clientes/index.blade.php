@@ -47,6 +47,7 @@
                                 <th style="text-align: center;">Nombre</th>
                                 <th style="text-align: center;">Teléfono</th>
                                 <th style="text-align: center;">Email</th>
+                                <th style="text-align: center;">Estado</th>
                                 <th style="text-align: center;">Plan</th>
                                 <th style="text-align: center;">Inicio</th>
                                 <th style="text-align: center;">Fin</th>
@@ -67,6 +68,13 @@
                                 </td>
                                 <td>{{ $cliente->telefono }}</td>
                                 <td>{{ $cliente->email }}</td>
+                                <td style="text-align: center;">
+                                    @if((int) $cliente->getRawOriginal('estado') === 1)
+                                    <span class="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Activo</span>
+                                    @else
+                                    <span class="inline-flex rounded-full bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-700">Inactivo</span>
+                                    @endif
+                                </td>
                                 <td>{{ $cliente->plan->nombre ?? '-' }}</td>
                                 <td>{{ \Carbon\Carbon::parse($cliente->fecha_ingreso)->format('d/m/Y') }}</td>
                                 <td>{{ \Carbon\Carbon::parse($cliente->fecha_fin)->format('d/m/Y') }}</td>
@@ -82,15 +90,23 @@
                                     </button>
                                     @endif
 
-                                    @if(!$esSuperAdmin)
-                                    <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
-                                        Opciones
-                                    </a>
-                                    @else
+                                    @if(in_array((int) Auth::user()->id_tipo_usuario, [1, 10], true))
                                     <a href="{{ route('clientes.edit', $cliente->slug) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
                                         Editar
                                     </a>
+
                                     @if($puedeGestionarClientes)
+                                    <a href="{{ route('clientes.cambiarEstado', $cliente->slug) }}" class="inline-block {{ (int) $cliente->getRawOriginal('estado') === 1 ? 'bg-red-500 hover:bg-red-800' : 'bg-green-600 hover:bg-green-800' }} text-white font-bold py-1 px-2 rounded ml-2">
+                                        {{ (int) $cliente->getRawOriginal('estado') === 1 ? 'Dar de baja' : 'Activar' }}
+                                    </a>
+                                    @endif
+                                    @elseif(!$esSuperAdmin)
+                                    <a href="{{ route('clientes.opciones.portada', $cliente->slug) }}" class="inline-block bg-gray-800 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded">
+                                        Opciones
+                                    </a>
+                                    @endif
+
+                                    @if($esSuperAdmin && $puedeGestionarClientes)
                                     <form action="{{ route('clientes.destroy', $cliente->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar este cliente y sus datos asociados?');">
                                         @csrf
                                         @method('DELETE')
@@ -98,7 +114,6 @@
                                             Eliminar
                                         </button>
                                     </form>
-                                    @endif
                                     @endif
                                 </td>
                             </tr>
