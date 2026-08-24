@@ -3,6 +3,13 @@
 @tailwind utilities;
 @import 'datatables.net-dt/css/jquery.dataTables.min.css';
 
+/* Marca de build — cambia el hash del bundle a propósito para invalidar una copia
+   cacheada corrupta en el hosting (una capa de caché intermedia varía por
+   User-Agent y quedó con una respuesta rota/incompleta para navegadores reales). */
+:root {
+    --ampaya-build: "2026-08-24-b";
+}
+
 
 /* Estilos para DataTables con Tailwind */
 .dataTables_wrapper .dataTables_length select {

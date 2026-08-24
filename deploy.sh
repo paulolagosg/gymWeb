@@ -76,35 +76,79 @@ fi
 echo "==> Compilando CSS/JS (npm run build)"
 (cd private && npm run build)
 
+# composer tampoco existe en este servidor (confirmado: "which composer" no devuelve
+# nada ni en una sesión interactiva) — mismo problema que con Vite/Tailwind. vendor/
+# se instala aquí, en local, y se copia al servidor por rsync; el servidor nunca
+# necesita ejecutar composer.
+#
+# Tiene que instalarse en private/vendor/ real (no en un directorio temporal aparte):
+# el autoloader de Composer graba rutas RELATIVAS para los archivos que se cargan por
+# "files" en composer.json (ej. app/Helpers/ClientesHelper.php) — relativas a la
+# posición real de vendor/composer/, dos niveles hacia arriba. Si vendor/ se instala en
+# cualquier otro lugar, esa relatividad se rompe y Composer graba una ruta absoluta de
+# esta máquina, que no existe en el servidor (así se rompió el primer intento). Encima,
+# el post-install de Laravel (`package:discover`) ejecuta ese autoloader de inmediato,
+# así que además necesita que app/ exista de verdad donde se instala — un directorio
+# temporal vacío no sirve.
+#
+# Por eso se respalda el vendor/ de desarrollo, se instala uno nuevo --no-dev encima,
+# se copia al servidor, y se restaura el de desarrollo enseguida — la ventana en la que
+# tu vendor/ local queda "cambiado" es solo mientras corre este bloque.
+if [[ -d private/vendor.dev-backup ]]; then
+  echo "ERROR: private/vendor.dev-backup ya existe — un deploy anterior no se restauró" >&2
+  echo "bien. Revisa a mano antes de continuar (probablemente haya que mover" >&2
+  echo "private/vendor.dev-backup de vuelta a private/vendor)." >&2
+  exit 1
+fi
+
+restore_dev_vendor() {
+  if [[ -d private/vendor.dev-backup ]]; then
+    rm -rf private/vendor
+    mv private/vendor.dev-backup private/vendor
+  fi
+}
+trap restore_dev_vendor EXIT
+
+mv private/vendor private/vendor.dev-backup
+
+echo "==> Instalando dependencias PHP para producción (composer install --no-dev)"
+(cd private && composer install --no-dev --optimize-autoloader --no-interaction)
+
 echo "==> Enviando a GitHub (git push)"
 git push origin main
 
-echo "==> Copiando el build compilado al servidor"
+echo "==> Copiando el build compilado y vendor/ al servidor"
 rsync -a private/public/build/ "${SSH_TARGET}:${REMOTE_PATH}/public/build/"
+rsync -a --delete private/vendor/ "${SSH_TARGET}:${REMOTE_PATH}/vendor/"
+
+echo "==> Restaurando vendor/ de desarrollo en local"
+restore_dev_vendor
 
 echo "==> Desplegando en el servidor"
 ssh "$SSH_TARGET" "REMOTE_PATH='$REMOTE_PATH' REMOTE_STAGING='$REMOTE_STAGING' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
-# Una sesión SSH no interactiva (como esta) no carga .bashrc/.bash_profile, que es
-# donde el hosting suele agregar composer al PATH — sin esto, "composer" no se
-# encuentra aunque funcione perfecto cuando te conectas a mano. El "|| true" es
-# necesario porque set -e cortaría el script si el archivo no existe.
-[ -f ~/.bash_profile ] && source ~/.bash_profile || true
-[ -f ~/.bashrc ] && source ~/.bashrc || true
-[ -f ~/.profile ] && source ~/.profile || true
-
 echo "--- git pull en el staging"
 cd "$REMOTE_STAGING"
 git pull origin main
 
-echo "--- copiando al directorio real (sin borrar nada no versionado, sin pisar public/build recién copiado)"
-rsync -a --exclude='public/build/' "$REMOTE_STAGING/private/" "$REMOTE_PATH/"
+echo "--- copiando al directorio real (sin borrar nada no versionado, sin pisar public/build ni vendor/ recién copiados)"
+rsync -a --exclude='public/build/' --exclude='vendor/' "$REMOTE_STAGING/private/" "$REMOTE_PATH/"
 
 cd "$REMOTE_PATH"
 
-echo "--- composer install"
-composer install --no-dev --optimize-autoloader --no-interaction
+# bootstrap/cache/packages.php y services.php son cachés generados por Laravel (no
+# van en git) con la lista de proveedores de paquetes detectados. Si quedó una versión
+# vieja de una instalación anterior con dependencias de desarrollo, sigue apuntando a
+# clases que el vendor/ --no-dev recién copiado ya no tiene, y la app no arranca — ni
+# siquiera "php artisan" logra bootear para regenerarlo él solo, porque intenta cargar
+# los proveedores viejos antes de llegar a ejecutar el comando. Por eso se borra primero
+# (Laravel lo reconstruye solo, sin necesitar composer) y recién después se usa artisan.
+echo "--- borrando caché vieja de paquetes descubiertos"
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+
+echo "--- regenerando caché de paquetes descubiertos"
+php artisan package:discover --ansi
 
 echo "--- migraciones pendientes"
 php artisan migrate --force
