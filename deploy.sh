@@ -61,8 +61,20 @@ if [[ -n "$(git status --porcelain -- private/)" ]]; then
   exit 1
 fi
 
+# public/build (CSS/JS compilado por Vite/Tailwind) está en .gitignore a propósito
+# (es un artefacto generado, no código fuente) — así que git nunca lo lleva al
+# servidor. Hay que compilarlo aquí y copiarlo aparte, con rsync directo, o el
+# servidor queda sirviendo un CSS viejo que no conoce las clases de Tailwind usadas
+# en cambios recientes (pasó con la landing page: el layout se veía roto porque el
+# CSS desplegado no tenía las clases nuevas compiladas).
+echo "==> Compilando CSS/JS (npm run build)"
+(cd private && npm run build)
+
 echo "==> Enviando a GitHub (git push)"
 git push origin main
+
+echo "==> Copiando el build compilado al servidor"
+rsync -a private/public/build/ "${SSH_TARGET}:${REMOTE_PATH}/public/build/"
 
 echo "==> Desplegando en el servidor"
 ssh "$SSH_TARGET" "REMOTE_PATH='$REMOTE_PATH' REMOTE_STAGING='$REMOTE_STAGING' bash -s" <<'REMOTE_SCRIPT'
@@ -72,8 +84,8 @@ echo "--- git pull en el staging"
 cd "$REMOTE_STAGING"
 git pull origin main
 
-echo "--- copiando al directorio real (sin borrar nada no versionado)"
-rsync -a "$REMOTE_STAGING/private/" "$REMOTE_PATH/"
+echo "--- copiando al directorio real (sin borrar nada no versionado, sin pisar public/build recién copiado)"
+rsync -a --exclude='public/build/' "$REMOTE_STAGING/private/" "$REMOTE_PATH/"
 
 cd "$REMOTE_PATH"
 

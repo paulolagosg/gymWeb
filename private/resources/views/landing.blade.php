@@ -106,8 +106,11 @@
 
     <!-- Nav -->
     <header class="fixed top-0 inset-x-0 z-30 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-            <span class="text-xl font-extrabold text-brand tracking-tight">Ampaya</span>
+        <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-2">
+                <img src="/logo.png" alt="Ampaya" class="h-9 w-auto" onerror="this.style.display='none'">
+                <span class="text-xl font-extrabold text-brand tracking-tight">Ampaya</span>
+            </a>
             <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
                 <a href="#funcionalidades" class="hover:text-gray-900">Funcionalidades</a>
                 <a href="#planes" class="hover:text-gray-900">Planes</a>
@@ -340,7 +343,10 @@
     <footer class="bg-white">
         <div class="max-w-6xl mx-auto px-6 py-12 grid sm:grid-cols-3 gap-8">
             <div>
-                <span class="text-lg font-extrabold text-brand">Ampaya</span>
+                <div class="flex items-center gap-2">
+                    <img src="/logo.png" alt="Ampaya" class="h-7 w-auto" onerror="this.style.display='none'">
+                    <span class="text-lg font-extrabold text-brand">Ampaya</span>
+                </div>
                 <p class="mt-2 text-sm text-gray-500">Software de administración para gimnasios.</p>
             </div>
             <div>
