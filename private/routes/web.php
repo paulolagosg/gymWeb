@@ -89,6 +89,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/clientes/traeDupla/{id}', [\App\Http\Controllers\ClientesController::class, 'traeDupla'])->name('clientes.traeDupla');
     Route::get('/clientes/create', [\App\Http\Controllers\ClientesController::class, 'create'])->name('clientes.create');
     Route::post('/clientes', [\App\Http\Controllers\ClientesController::class, 'store'])->name('clientes.store');
+    Route::get('/clientes/importar', [\App\Http\Controllers\ClientesImportController::class, 'create'])->name('clientes.importar');
+    Route::get('/clientes/importar/plantilla', [\App\Http\Controllers\ClientesImportController::class, 'plantilla'])->name('clientes.importar.plantilla');
+    Route::post('/clientes/importar/previsualizar', [\App\Http\Controllers\ClientesImportController::class, 'previsualizar'])->name('clientes.importar.previsualizar');
+    Route::post('/clientes/importar', [\App\Http\Controllers\ClientesImportController::class, 'store'])->name('clientes.importar.store');
     Route::get('/clientes/{slug}/edit', [\App\Http\Controllers\ClientesController::class, 'edit'])->name('clientes.edit');
     Route::put('/clientes/{slug}', [\App\Http\Controllers\ClientesController::class, 'update'])->name('clientes.update');
     Route::delete('/clientes/{slug}', [\App\Http\Controllers\ClientesController::class, 'destroy'])->name('clientes.destroy');

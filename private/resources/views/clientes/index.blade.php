@@ -9,6 +9,9 @@
                     <a href="{{ route('clientes.create', $esSuperAdmin && !empty($gimnasioSeleccionado) ? ['id_gimnasio' => $gimnasioSeleccionado] : []) }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
                         Agregar Cliente
                     </a>
+                    <a href="{{ route('clientes.importar', $esSuperAdmin && !empty($gimnasioSeleccionado) ? ['id_gimnasio' => $gimnasioSeleccionado] : []) }}" class="bg-gray-700 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                        Importar CSV
+                    </a>
 
                     @if($esSuperAdmin && isset($gimnasios))
                     <form method="GET" class="flex items-center gap-2">
