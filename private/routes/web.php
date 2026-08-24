@@ -15,7 +15,7 @@ use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('auth/login');
+    return view('landing');
 });
 
 // Página intermedia para el enlace de recuperación de clave enviado por correo

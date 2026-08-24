@@ -6,7 +6,9 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git fetch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Read(//Users/plakes/.ssh/**)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=5 ampara_cl@gym.ampaya.cl \"echo ok\")"
     ]
   }
 }
