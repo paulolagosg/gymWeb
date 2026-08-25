@@ -197,4 +197,23 @@ class Gimnasios extends Model
     {
         return $this->hasMany(GimnasioFacturacion::class, 'id_gimnasio');
     }
+
+    /**
+     * Mensaje mostrado cuando el gimnasio está bloqueado (trial vencido o suspensión
+     * manual). Solo el admin del gimnasio (id_tipo_usuario=1) ve el motivo real —
+     * entrenadores y clientes no deben enterarse de que hay una deuda con la
+     * plataforma, así que ven un mensaje genérico. El super-admin nunca llega a ver
+     * este mensaje (está exento del bloqueo en Middleware/EnsureGimnasioActivo y en
+     * AuthController).
+     */
+    public function mensajeBloqueo(int $idTipoUsuario): string
+    {
+        if ($idTipoUsuario !== 1) {
+            return 'Tu gimnasio no está disponible temporalmente. Consulta con la administración de tu gimnasio.';
+        }
+
+        return $this->bloqueado_motivo === 'trial_vencido'
+            ? 'Tu periodo de prueba de 7 días terminó. Contáctanos para seguir usando Ampaya.'
+            : 'Tu gimnasio tiene un pago pendiente con la plataforma. Contáctanos para regularizar.';
+    }
 }

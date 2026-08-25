@@ -211,12 +211,8 @@ class AuthController extends Controller
             return null;
         }
 
-        $mensaje = $gimnasio->bloqueado_motivo === 'trial_vencido'
-            ? 'Tu periodo de prueba de 7 días terminó. Contáctanos para seguir usando Ampaya.'
-            : 'Tu gimnasio tiene un pago pendiente con la plataforma. Contáctanos para regularizar.';
-
         return response()->json([
-            'message' => $mensaje,
+            'message' => $gimnasio->mensajeBloqueo((int) $user->id_tipo_usuario),
             'code' => 'gimnasio_bloqueado',
             'motivo' => $gimnasio->bloqueado_motivo,
         ], 403);

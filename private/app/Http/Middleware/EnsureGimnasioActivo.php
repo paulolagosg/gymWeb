@@ -21,9 +21,7 @@ class EnsureGimnasioActivo
         $gimnasio = $user->gimnasio ?? $user->cliente?->gimnasio;
 
         if ($gimnasio && $gimnasio->bloqueado) {
-            $mensaje = $gimnasio->bloqueado_motivo === 'trial_vencido'
-                ? 'Tu periodo de prueba de 7 días terminó. Contáctanos para seguir usando Ampaya.'
-                : 'Tu gimnasio tiene un pago pendiente con la plataforma. Contáctanos para regularizar.';
+            $mensaje = $gimnasio->mensajeBloqueo((int) $user->id_tipo_usuario);
 
             if ($request->wantsJson()) {
                 return response()->json([

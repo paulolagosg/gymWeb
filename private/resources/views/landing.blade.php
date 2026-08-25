@@ -118,7 +118,7 @@
                 <a href="#planes" class="hover:text-gray-900">Planes</a>
                 <a href="#contacto" class="hover:text-gray-900">Contacto</a>
             </nav>
-            <a href="{{ route('login') }}"
+            <a href="https://play.google.com/store/apps/details?id=gym.ampaya.cl" target="_blank" rel="noopener"
                 class="btn-primary text-white text-sm font-semibold py-2 px-5 rounded-lg">
                 Iniciar sesión
             </a>
@@ -140,7 +140,7 @@
                     plataforma — para administradores, entrenadores y clientes, desde el celular.
                 </p>
                 <div class="mt-10 flex flex-wrap items-center gap-4">
-                    <a href="{{ route('login') }}"
+                    <a href="https://play.google.com/store/apps/details?id=gym.ampaya.cl" target="_blank" rel="noopener"
                         class="inline-block bg-white text-gray-900 font-bold py-3 px-8 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                         Iniciar sesión
                     </a>
@@ -279,11 +279,27 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+
+                <div class="card-hover bg-white rounded-2xl border-2 border-dashed border-gray-300 p-8">
+                    <h3 class="font-extrabold text-lg text-gray-900">Prueba gratis</h3>
+                    <p class="text-sm text-gray-500 mt-1">7 días, sin costo</p>
+                    <p class="mt-4 text-3xl font-extrabold text-gray-900">
+                        $0
+                    </p>
+                    <ul class="mt-6 space-y-3 text-sm text-gray-700">
+                        <li class="flex gap-2"><span class="text-emerald-600">✓</span> Acceso completo por 7 días</li>
+                        <li class="flex gap-2"><span class="text-emerald-600">✓</span> Todas las funcionalidades de Pro</li>
+                        <li class="flex gap-2"><span class="text-emerald-600">✓</span> Sin tarjeta ni compromiso</li>
+                    </ul>
+                </div>
 
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8">
                     <h3 class="font-extrabold text-lg text-gray-900">Starter</h3>
                     <p class="text-sm text-gray-500 mt-1">Lo esencial para operar</p>
+                    <p class="mt-4 text-3xl font-extrabold text-gray-900">
+                        ${{ number_format($precios['starter'] ?? 0, 0, ',', '.') }}<span class="text-sm font-medium text-gray-500">/mes</span>
+                    </p>
                     <ul class="mt-6 space-y-3 text-sm text-gray-700">
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Agenda y calendario</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Cuenta corriente y cobros</li>
@@ -298,6 +314,9 @@
                     </span>
                     <h3 class="font-extrabold text-lg text-gray-900">Estándar</h3>
                     <p class="text-sm text-gray-500 mt-1">Más cercanía con tus clientes</p>
+                    <p class="mt-4 text-3xl font-extrabold text-gray-900">
+                        ${{ number_format($precios['estandar'] ?? 0, 0, ',', '.') }}<span class="text-sm font-medium text-gray-500">/mes</span>
+                    </p>
                     <ul class="mt-6 space-y-3 text-sm text-gray-700">
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Todo lo de Starter</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Gamificación (racha y puntos)</li>
@@ -309,6 +328,9 @@
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8">
                     <h3 class="font-extrabold text-lg text-gray-900">Pro</h3>
                     <p class="text-sm text-gray-500 mt-1">La plataforma completa</p>
+                    <p class="mt-4 text-3xl font-extrabold text-gray-900">
+                        ${{ number_format($precios['pro'] ?? 0, 0, ',', '.') }}<span class="text-sm font-medium text-gray-500">/mes</span>
+                    </p>
                     <ul class="mt-6 space-y-3 text-sm text-gray-700">
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Todo lo de Estándar</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Open Gym y plan de alimentación</li>
@@ -340,7 +362,7 @@
                 </div>
             </a>
 
-            <a href="tel:+56992803469" class="card-hover flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-6 sm:w-72">
+            <a href="https://wa.me/56992803469" target="_blank" rel="noopener" class="card-hover flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-6 sm:w-72">
                 <div class="feature-icon w-12 h-12 rounded-lg flex items-center justify-center shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -358,9 +380,9 @@
     <section class="hero-gradient">
         <div class="max-w-4xl mx-auto px-6 py-16 text-center">
             <h2 class="text-2xl md:text-3xl font-extrabold text-white">¿Ya tienes acceso a tu gimnasio en Ampaya?</h2>
-            <p class="mt-3 text-white/90">Entra con tu correo y contraseña.</p>
+            <p class="mt-3 text-white/90">Descarga la app y entra con tu correo y contraseña.</p>
             <div class="mt-8">
-                <a href="{{ route('login') }}"
+                <a href="https://play.google.com/store/apps/details?id=gym.ampaya.cl" target="_blank" rel="noopener"
                     class="inline-block bg-white text-gray-900 font-bold py-3 px-8 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     Iniciar sesión
                 </a>
@@ -388,8 +410,8 @@
                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Contacto</p>
                 <ul class="space-y-2 text-sm text-gray-600">
                     <li><a href="mailto:contacto@ampaya.cl" class="hover:text-gray-900">contacto@ampaya.cl</a></li>
-                    <li><a href="tel:+56992803469" class="hover:text-gray-900">+56 9 9280 3469</a></li>
-                    <li><a href="{{ route('login') }}" class="hover:text-gray-900">Iniciar sesión</a></li>
+                    <li><a href="https://wa.me/56992803469" target="_blank" rel="noopener" class="hover:text-gray-900">+56 9 9280 3469</a></li>
+                    <li><a href="https://play.google.com/store/apps/details?id=gym.ampaya.cl" target="_blank" rel="noopener" class="hover:text-gray-900">Iniciar sesión</a></li>
                 </ul>
             </div>
         </div>

@@ -15,7 +15,10 @@ use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('landing');
+    $precios = \App\Models\PlanPreset::whereIn('plan', \App\Models\Gimnasios::PLAN_TIERS)
+        ->pluck('precio_mensual', 'plan');
+
+    return view('landing', ['precios' => $precios]);
 });
 
 // El hosting de producción enruta absolutamente toda petición a través de Laravel
