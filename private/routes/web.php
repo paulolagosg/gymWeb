@@ -79,7 +79,7 @@ Route::get('/app/reset-password', function (\Illuminate\Http\Request $request) {
 
 
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'gimnasio.activo'])->group(function () {
 
     Route::get('/notificaciones', [NotificationsController::class, 'index'])->name('notifications.index');
     Route::post('/notificaciones/leer-todas', [NotificationsController::class, 'markAllAsRead'])->name('notifications.read-all');

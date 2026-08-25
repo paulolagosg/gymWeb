@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'api.auth' => \App\Http\Middleware\EnsureApiAuthenticated::class,
             'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
+            'gimnasio.activo' => \App\Http\Middleware\EnsureGimnasioActivo::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

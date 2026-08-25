@@ -48,6 +48,11 @@ class AuthController extends Controller
             }
         }
 
+        if ($bloqueo = $this->gimnasioBloqueadoResponse($user)) {
+            Auth::logout();
+            return $bloqueo;
+        }
+
         // Revocar tokens previos del mismo dispositivo si se reusa el nombre
         $deviceName = $request->input('device_name', 'mobile');
         $user->tokens()->where('name', $deviceName)->delete();
@@ -75,6 +80,11 @@ class AuthController extends Controller
                 $user->currentAccessToken()->delete();
                 return response()->json(['message' => 'Tu cuenta está inactiva.'], 403);
             }
+        }
+
+        if ($bloqueo = $this->gimnasioBloqueadoResponse($user)) {
+            $user->currentAccessToken()->delete();
+            return $bloqueo;
         }
 
         return response()->json([
@@ -181,6 +191,36 @@ class AuthController extends Controller
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Bloqueo por facturación de plataforma (trial vencido o suspensión manual) —
+     * afecta a todo el gimnasio, todos los roles, salvo el super-admin (necesita poder
+     * entrar para desbloquearlo). Ver App\Http\Middleware\EnsureGimnasioActivo, que
+     * cubre el resto de la API una vez que ya hay sesión — este chequeo cubre login/me
+     * porque un 403 genérico ahí borra la sesión local en la app (useRestoreSession),
+     * así que el mensaje correcto tiene que aparecer aquí para que se vea.
+     */
+    private function gimnasioBloqueadoResponse(\App\Models\User $user): ?JsonResponse
+    {
+        if ((int) $user->id_tipo_usuario === 10) {
+            return null;
+        }
+
+        $gimnasio = $user->gimnasio ?? $user->cliente?->gimnasio;
+        if (! $gimnasio || ! $gimnasio->bloqueado) {
+            return null;
+        }
+
+        $mensaje = $gimnasio->bloqueado_motivo === 'trial_vencido'
+            ? 'Tu periodo de prueba de 7 días terminó. Contáctanos para seguir usando Ampaya.'
+            : 'Tu gimnasio tiene un pago pendiente con la plataforma. Contáctanos para regularizar.';
+
+        return response()->json([
+            'message' => $mensaje,
+            'code' => 'gimnasio_bloqueado',
+            'motivo' => $gimnasio->bloqueado_motivo,
+        ], 403);
+    }
 
     private function formatUser(\App\Models\User $user): array
     {

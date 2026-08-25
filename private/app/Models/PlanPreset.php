@@ -11,6 +11,7 @@ class PlanPreset extends Model
     protected $fillable = [
         'plan',
         'features',
+        'precio_mensual',
     ];
 
     protected $casts = [

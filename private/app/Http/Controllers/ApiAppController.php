@@ -12,7 +12,9 @@ use App\Models\EvaluacionInicial;
 use App\Models\EvaluacionInicialOpcion;
 use App\Models\EvaluacionInicialPregunta;
 use App\Models\EvaluacionInicialRespuesta;
+use App\Models\EstadosPagos;
 use App\Models\EvaluacionInicialSeccion;
+use App\Models\GimnasioFacturacion;
 use App\Models\Gimnasios;
 use App\Models\PlanPreset;
 use App\Models\User;
@@ -2483,9 +2485,13 @@ class ApiAppController extends Controller
                 'estado',
                 'features',
                 'plan',
+                'bloqueado',
+                'bloqueado_motivo',
             ])
             ->map(function ($gimnasio) {
                 $gimnasio->features = Gimnasios::featuresActivas((int) $gimnasio->id);
+                $gimnasio->bloqueado = (bool) $gimnasio->bloqueado;
+                $gimnasio->facturacion = $this->facturacionResumen((int) $gimnasio->id);
                 return $gimnasio;
             });
 
@@ -2636,7 +2642,7 @@ class ApiAppController extends Controller
         $plan = $v['plan'] ?? null;
         $preset = Gimnasios::featurePresetForPlan($plan);
 
-        $update = ['plan' => $plan];
+        $update = ['plan' => $plan, 'bloqueado' => false, 'bloqueado_motivo' => null];
         if ($preset !== null) {
             $features = [];
             foreach (Gimnasios::FEATURE_KEYS as $key) {
@@ -2647,11 +2653,126 @@ class ApiAppController extends Controller
 
         $gimnasio->update($update);
 
+        // Cambiar de plan cierra el ciclo de facturación a medio empezar (si había uno
+        // sin pagar) y abre uno nuevo — el trial dura 7 días, los planes pagos 1 mes.
+        GimnasioFacturacion::where('id_gimnasio', $id)->whereNull('fecha_pago')->delete();
+
+        if (in_array($plan, Gimnasios::PLAN_TIERS, true)) {
+            $inicio = now()->toDateString();
+            GimnasioFacturacion::create([
+                'id_gimnasio' => $id,
+                'plan' => $plan,
+                'monto' => (int) (PlanPreset::where('plan', $plan)->value('precio_mensual') ?? 0),
+                'fecha_inicio' => $inicio,
+                'fecha_vencimiento' => $plan === 'trial'
+                    ? now()->addDays(7)->toDateString()
+                    : now()->addMonth()->toDateString(),
+                'fecha_pago' => null,
+                'id_estado_pago' => $this->resolveEstadoPagoId('pendiente'),
+            ]);
+        }
+
         return response()->json([
             'message' => 'Plan actualizado.',
             'plan' => $gimnasio->plan,
             'features' => Gimnasios::featuresActivas($id),
+            'facturacion' => $this->facturacionResumen($id),
         ]);
+    }
+
+    public function adminGimnasioMarcarPago(Request $request, int $id): JsonResponse
+    {
+        if ((int) ($request->user()->id_tipo_usuario ?? 0) !== 10) {
+            return response()->json(['message' => 'No autorizado.'], 403);
+        }
+
+        $gimnasio = Gimnasios::find($id);
+        if (! $gimnasio) {
+            return response()->json(['message' => 'Gimnasio no encontrado.'], 404);
+        }
+
+        $pendiente = Gimnasios::facturacionVigente($id);
+        if (! $pendiente) {
+            return response()->json(['message' => 'No hay una facturación pendiente para este gimnasio.'], 422);
+        }
+
+        $hoy = now()->toDateString();
+        $pendiente->update([
+            'fecha_pago' => $hoy,
+            'id_estado_pago' => $this->resolveEstadoPagoId('pagado'),
+        ]);
+
+        GimnasioFacturacion::create([
+            'id_gimnasio' => $id,
+            'plan' => $gimnasio->plan,
+            'monto' => (int) (PlanPreset::where('plan', $gimnasio->plan)->value('precio_mensual') ?? 0),
+            'fecha_inicio' => $pendiente->fecha_vencimiento,
+            'fecha_vencimiento' => \Carbon\Carbon::parse($pendiente->fecha_vencimiento)->addMonth()->toDateString(),
+            'fecha_pago' => null,
+            'id_estado_pago' => $this->resolveEstadoPagoId('pendiente'),
+        ]);
+
+        if ($gimnasio->bloqueado) {
+            $gimnasio->update(['bloqueado' => false, 'bloqueado_motivo' => null]);
+        }
+
+        return response()->json([
+            'message' => 'Pago registrado.',
+            'facturacion' => $this->facturacionResumen($id),
+        ]);
+    }
+
+    public function adminGimnasioBloquear(Request $request, int $id): JsonResponse
+    {
+        if ((int) ($request->user()->id_tipo_usuario ?? 0) !== 10) {
+            return response()->json(['message' => 'No autorizado.'], 403);
+        }
+
+        $gimnasio = Gimnasios::find($id);
+        if (! $gimnasio) {
+            return response()->json(['message' => 'Gimnasio no encontrado.'], 404);
+        }
+
+        $gimnasio->update(['bloqueado' => true, 'bloqueado_motivo' => 'pago_vencido_manual']);
+
+        return response()->json(['message' => 'Gimnasio bloqueado.']);
+    }
+
+    public function adminGimnasioDesbloquear(Request $request, int $id): JsonResponse
+    {
+        if ((int) ($request->user()->id_tipo_usuario ?? 0) !== 10) {
+            return response()->json(['message' => 'No autorizado.'], 403);
+        }
+
+        $gimnasio = Gimnasios::find($id);
+        if (! $gimnasio) {
+            return response()->json(['message' => 'Gimnasio no encontrado.'], 404);
+        }
+
+        $gimnasio->update(['bloqueado' => false, 'bloqueado_motivo' => null]);
+
+        return response()->json(['message' => 'Gimnasio desbloqueado.']);
+    }
+
+    private function resolveEstadoPagoId(string $slug): int
+    {
+        return (int) (EstadosPagos::where('slug', $slug)->value('id') ?? 1);
+    }
+
+    private function facturacionResumen(int $idGimnasio): ?array
+    {
+        $pendiente = Gimnasios::facturacionVigente($idGimnasio);
+        if (! $pendiente) {
+            return null;
+        }
+
+        $hoy = now()->toDateString();
+
+        return [
+            'fecha_vencimiento' => $pendiente->fecha_vencimiento->toDateString(),
+            'monto' => (int) $pendiente->monto,
+            'estado' => $pendiente->fecha_vencimiento->toDateString() < $hoy ? 'vencido' : 'pendiente',
+        ];
     }
 
     // ===================================================================
@@ -2682,6 +2803,7 @@ class ApiAppController extends Controller
             $planes[] = [
                 'plan' => $plan,
                 'features' => $features,
+                'precio_mensual' => (int) ($presets->get($plan)?->precio_mensual ?? 0),
                 'gimnasios_count' => (int) ($conteoPorPlan[$plan] ?? 0),
             ];
         }
@@ -2705,6 +2827,7 @@ class ApiAppController extends Controller
                 array_map(fn($key) => "features.{$key}", Gimnasios::FEATURE_KEYS),
                 'sometimes|boolean',
             ),
+            'precio_mensual' => 'sometimes|integer|min:0',
         ]);
 
         $features = [];
@@ -2712,12 +2835,20 @@ class ApiAppController extends Controller
             $features[$key] = (bool) ($v['features'][$key] ?? false);
         }
 
-        PlanPreset::updateOrCreate(['plan' => $plan], ['features' => $features]);
+        // El plan "trial" es gratuito por definición — se ignora cualquier precio que
+        // llegue del cliente para ese plan en particular, en vez de validarlo aparte.
+        $precioMensual = $plan === 'trial' ? 0 : (int) ($v['precio_mensual'] ?? 0);
+
+        PlanPreset::updateOrCreate(['plan' => $plan], [
+            'features' => $features,
+            'precio_mensual' => $precioMensual,
+        ]);
 
         return response()->json([
             'message' => 'Composición del plan actualizada. Los gimnasios ya asignados a este plan no cambian hasta que se aplique explícitamente.',
             'plan' => $plan,
             'features' => $features,
+            'precio_mensual' => $precioMensual,
         ]);
     }
 

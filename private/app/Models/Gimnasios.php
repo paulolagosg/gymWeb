@@ -32,11 +32,14 @@ class Gimnasios extends Model
         'estado',
         'features',
         'plan',
+        'bloqueado',
+        'bloqueado_motivo',
     ];
 
     protected $casts = [
         'estado' => 'integer',
         'features' => 'array',
+        'bloqueado' => 'boolean',
     ];
 
     /**
@@ -65,7 +68,7 @@ class Gimnasios extends Model
      * vive en la tabla `plan_presets` (editable por el super-admin desde "Planes
      * comerciales"), no está hardcodeada aquí.
      */
-    public const PLAN_TIERS = ['starter', 'estandar', 'pro'];
+    public const PLAN_TIERS = ['trial', 'starter', 'estandar', 'pro'];
 
     /**
      * Devuelve las claves de FEATURE_KEYS activas para $plan, o null si $plan no es
@@ -175,5 +178,23 @@ class Gimnasios extends Model
         }
 
         return static::featuresActivas($idGimnasio)[$key] ?? false;
+    }
+
+    /**
+     * Ciclo de facturación de plataforma sin pagar (o null si no hay ninguno vigente).
+     * Invariante: solo existe una fila con fecha_pago = null por gimnasio a la vez,
+     * mantenida en ApiAppController::adminGimnasiosPlanUpdate/adminGimnasioMarcarPago.
+     */
+    public static function facturacionVigente(int $idGimnasio): ?GimnasioFacturacion
+    {
+        return GimnasioFacturacion::where('id_gimnasio', $idGimnasio)
+            ->whereNull('fecha_pago')
+            ->latest('fecha_inicio')
+            ->first();
+    }
+
+    public function facturaciones()
+    {
+        return $this->hasMany(GimnasioFacturacion::class, 'id_gimnasio');
     }
 }

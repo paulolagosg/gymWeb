@@ -32,7 +32,7 @@ Route::prefix('auth')->group(function () {
 });
 
 // Rutas protegidas con Sanctum
-Route::middleware('api.auth')->group(function () {
+Route::middleware(['api.auth', 'gimnasio.activo'])->group(function () {
     Route::prefix('auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -82,7 +82,7 @@ Route::prefix('app')->group(function () {
     Route::post('/auth/reset-password', [ApiAppController::class, 'authResetPassword']);
 
     // Rutas protegidas con Sanctum
-    Route::middleware('api.auth')->group(function () {
+    Route::middleware(['api.auth', 'gimnasio.activo'])->group(function () {
 
         // Autenticación
         Route::get('/auth/me',              [ApiAppController::class, 'me']);
@@ -222,6 +222,9 @@ Route::prefix('app')->group(function () {
             Route::delete('/gimnasios/{id}',    [ApiAppController::class, 'adminGimnasiosDestroy']);
             Route::put('/gimnasios/{id}/features', [ApiAppController::class, 'adminGimnasiosFeaturesUpdate']);
             Route::put('/gimnasios/{id}/plan',     [ApiAppController::class, 'adminGimnasiosPlanUpdate']);
+            Route::post('/gimnasios/{id}/facturacion/marcar-pago', [ApiAppController::class, 'adminGimnasioMarcarPago']);
+            Route::post('/gimnasios/{id}/bloquear',    [ApiAppController::class, 'adminGimnasioBloquear']);
+            Route::post('/gimnasios/{id}/desbloquear', [ApiAppController::class, 'adminGimnasioDesbloquear']);
 
             // Composición de planes comerciales (Starter/Estándar/Pro)
             Route::get('/planes-comerciales',                  [ApiAppController::class, 'adminPlanesComercialesIndex']);
