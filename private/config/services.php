@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'contacto' => [
+        'email' => env('CONTACTO_LEADS_EMAIL', 'contacto@ampaya.cl'),
+    ],
+
 ];

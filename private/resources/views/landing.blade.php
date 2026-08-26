@@ -292,6 +292,10 @@
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Todas las funcionalidades de Pro</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Sin tarjeta ni compromiso</li>
                     </ul>
+                    <button type="button" onclick="openLeadModal('trial', 'Prueba gratis')"
+                        class="mt-6 w-full py-3 rounded-lg font-bold border-2 border-dashed border-gray-300 text-gray-700 hover:border-gray-400 transition-colors">
+                        Empezar prueba gratis
+                    </button>
                 </div>
 
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8">
@@ -306,6 +310,10 @@
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Clientes, entrenadores y evaluación inicial</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Recordatorios automáticos</li>
                     </ul>
+                    <button type="button" onclick="openLeadModal('starter', 'Starter')"
+                        class="mt-6 w-full py-3 rounded-lg font-bold border border-gray-300 text-gray-900 hover:border-gray-400 transition-colors">
+                        Contratar Starter
+                    </button>
                 </div>
 
                 <div class="card-hover plan-featured bg-white rounded-2xl p-8 relative">
@@ -323,6 +331,10 @@
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Compartir progreso y entrenamientos</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Catálogo de beneficios y convenios</li>
                     </ul>
+                    <button type="button" onclick="openLeadModal('estandar', 'Estándar')"
+                        class="mt-6 w-full py-3 rounded-lg font-bold bg-[var(--primary)] text-white hover:opacity-90 transition-opacity">
+                        Contratar Estándar
+                    </button>
                 </div>
 
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8">
@@ -337,6 +349,10 @@
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Métricas de perímetros y reportes en PDF</li>
                         <li class="flex gap-2"><span class="text-emerald-600">✓</span> Encuestas, videos y reportes de agenda</li>
                     </ul>
+                    <button type="button" onclick="openLeadModal('pro', 'Pro')"
+                        class="mt-6 w-full py-3 rounded-lg font-bold border border-gray-300 text-gray-900 hover:border-gray-400 transition-colors">
+                        Contratar Pro
+                    </button>
                 </div>
 
             </div>
@@ -421,6 +437,86 @@
             </div>
         </div>
     </footer>
+
+    <!-- Modal de solicitud de contacto (selector de plan) -->
+    <div id="leadModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center px-4 py-10 overflow-y-auto">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full relative">
+            <button type="button" onclick="closeLeadModal()" aria-label="Cerrar"
+                class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+
+            <h3 class="text-xl font-extrabold text-gray-900">Quiero <span id="leadModalPlanLabel"></span></h3>
+            <p class="mt-1 text-sm text-gray-600">Déjanos tus datos y te contactamos para partir.</p>
+
+            @if(session('lead_success'))
+                <p class="mt-4 rounded-lg bg-emerald-50 text-emerald-700 text-sm p-3">
+                    ¡Listo! Recibimos tu solicitud, te contactaremos pronto.
+                </p>
+            @endif
+
+            @if($errors->any())
+                <ul class="mt-4 rounded-lg bg-red-50 text-red-700 text-sm p-3 space-y-1">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            @endif
+
+            <form method="POST" action="{{ route('solicitudes-contacto.store') }}" class="mt-4 space-y-3">
+                @csrf
+                <input type="hidden" name="plan" id="leadModalPlanInput" value="{{ old('plan') }}">
+
+                <input type="text" name="nombre_gimnasio" placeholder="Nombre del gimnasio" required
+                    value="{{ old('nombre_gimnasio') }}"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">
+
+                <input type="text" name="nombre_contacto" placeholder="Tu nombre" required
+                    value="{{ old('nombre_contacto') }}"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">
+
+                <input type="email" name="email" placeholder="Correo" required
+                    value="{{ old('email') }}"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">
+
+                <input type="text" name="telefono" placeholder="Teléfono (opcional)"
+                    value="{{ old('telefono') }}"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">
+
+                <textarea name="mensaje" placeholder="Cuéntanos algo más (opcional)" rows="3"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">{{ old('mensaje') }}</textarea>
+
+                <button type="submit"
+                    class="w-full py-3 rounded-lg font-bold bg-[var(--primary)] text-white hover:opacity-90 transition-opacity">
+                    Enviar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openLeadModal(plan, label) {
+            document.getElementById('leadModalPlanInput').value = plan;
+            document.getElementById('leadModalPlanLabel').textContent = label;
+            document.getElementById('leadModal').classList.remove('hidden');
+        }
+
+        function closeLeadModal() {
+            document.getElementById('leadModal').classList.add('hidden');
+        }
+
+        @php
+            $leadPlanLabels = ['trial' => 'Prueba gratis', 'starter' => 'Starter', 'estandar' => 'Estándar', 'pro' => 'Pro'];
+            $leadReopenPlan = old('plan');
+        @endphp
+
+        @if(session('lead_success') || $errors->any())
+            document.addEventListener('DOMContentLoaded', function () {
+                openLeadModal(
+                    {{ Illuminate\Support\Js::from($leadReopenPlan ?? '') }},
+                    {{ Illuminate\Support\Js::from($leadPlanLabels[$leadReopenPlan] ?? '') }}
+                );
+            });
+        @endif
+    </script>
 
 </body>
 

@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EvaluacionInicialController;
 use App\Http\Controllers\GimnasiosController;
 use App\Http\Controllers\TermsAndConditionsWebController;
+use App\Http\Controllers\SolicitudContactoController;
 use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,10 @@ Route::get('/', function () {
 
     return view('landing', ['precios' => $precios]);
 });
+
+Route::post('/solicitudes-contacto', [SolicitudContactoController::class, 'store'])
+    ->middleware('throttle:6,1')
+    ->name('solicitudes-contacto.store');
 
 // El hosting de producción enruta absolutamente toda petición a través de Laravel
 // (confirmado: ni siquiera un .php suelto en la raíz se sirve directo — el servidor
