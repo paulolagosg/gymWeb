@@ -2326,16 +2326,17 @@ class ApiAppController extends Controller
             'email' => "required|email|unique:users,email,{$id}",
             'id_tipo_usuario' => 'required|integer|in:1,2,3,4,5',
             'titulo' => 'nullable|string|max:255',
-            'porcentaje' => 'nullable|numeric',
             'password' => 'nullable|string|min:6',
         ]);
 
+        // 'porcentaje' ya no se edita desde esta pantalla — no se incluye en $data para
+        // no sobreescribir con null la comisión ya guardada del entrenador (se sigue
+        // usando en DashboardController para la proyección de ingresos).
         $data = [
             'name' => $v['name'],
             'email' => $v['email'],
             'id_tipo_usuario' => $v['id_tipo_usuario'],
             'titulo' => $v['titulo'] ?? null,
-            'porcentaje' => $v['porcentaje'] ?? null,
             'updated_at' => now(),
         ];
         if (! empty($v['password'])) $data['password'] = Hash::make($v['password']);

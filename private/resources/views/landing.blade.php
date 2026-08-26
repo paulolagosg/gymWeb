@@ -448,13 +448,13 @@
             <p class="mt-1 text-sm text-gray-600">Déjanos tus datos y te contactamos para partir.</p>
 
             @if(session('lead_success'))
-                <p class="mt-4 rounded-lg bg-emerald-50 text-emerald-700 text-sm p-3">
+                <p id="leadSuccessBanner" class="mt-4 rounded-lg bg-emerald-50 text-emerald-700 text-sm p-3">
                     ¡Listo! Recibimos tu solicitud, te contactaremos pronto.
                 </p>
             @endif
 
             @if($errors->any())
-                <ul class="mt-4 rounded-lg bg-red-50 text-red-700 text-sm p-3 space-y-1">
+                <ul id="leadErrorsBanner" class="mt-4 rounded-lg bg-red-50 text-red-700 text-sm p-3 space-y-1">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -493,7 +493,12 @@
     </div>
 
     <script>
+        // Abre el modal para que el usuario empiece una solicitud nueva — por eso
+        // limpia cualquier aviso de éxito/error que haya quedado de un envío anterior
+        // (si no, reabrir el modal para OTRO plan seguía mostrando el "¡Listo!" viejo).
         function openLeadModal(plan, label) {
+            document.getElementById('leadSuccessBanner')?.remove();
+            document.getElementById('leadErrorsBanner')?.remove();
             document.getElementById('leadModalPlanInput').value = plan;
             document.getElementById('leadModalPlanLabel').textContent = label;
             document.getElementById('leadModal').classList.remove('hidden');
@@ -509,11 +514,13 @@
         @endphp
 
         @if(session('lead_success') || $errors->any())
+            // Reabre el modal para mostrar el resultado del envío que acaba de ocurrir
+            // (redirect de vuelta tras el POST) — a propósito NO pasa por openLeadModal()
+            // de arriba, para no borrar el aviso que justo queremos mostrar.
             document.addEventListener('DOMContentLoaded', function () {
-                openLeadModal(
-                    {{ Illuminate\Support\Js::from($leadReopenPlan ?? '') }},
-                    {{ Illuminate\Support\Js::from($leadPlanLabels[$leadReopenPlan] ?? '') }}
-                );
+                document.getElementById('leadModalPlanInput').value = {{ Illuminate\Support\Js::from($leadReopenPlan ?? '') }};
+                document.getElementById('leadModalPlanLabel').textContent = {{ Illuminate\Support\Js::from($leadPlanLabels[$leadReopenPlan] ?? '') }};
+                document.getElementById('leadModal').classList.remove('hidden');
             });
         @endif
     </script>
