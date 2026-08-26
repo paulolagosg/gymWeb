@@ -217,6 +217,11 @@ class ApiAppController extends Controller
         return (new AuthController())->changePassword($request);
     }
 
+    public function eliminarCuenta(Request $request): JsonResponse
+    {
+        return (new AuthController())->eliminarCuenta($request);
+    }
+
     // ===================================================================
     // ADMIN — DASHBOARD (con filtro por entrenador)
     // ===================================================================

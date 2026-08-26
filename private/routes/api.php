@@ -88,6 +88,7 @@ Route::prefix('app')->group(function () {
         Route::get('/auth/me',              [ApiAppController::class, 'me']);
         Route::post('/auth/logout',         [ApiAppController::class, 'logout']);
         Route::post('/auth/change-password', [ApiAppController::class, 'changePassword']);
+        Route::post('/auth/eliminar-cuenta', [ApiAppController::class, 'eliminarCuenta']);
         Route::get('/legal/terms/current', [TermsAndConditionsController::class, 'current']);
         Route::post('/legal/terms/accept', [TermsAndConditionsController::class, 'acceptCurrent']);
         Route::get('/notifications', [NotificationsController::class, 'index']);

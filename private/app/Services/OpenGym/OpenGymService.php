@@ -22,6 +22,15 @@ class OpenGymService
     private const STATUS_COMPLETED = 'completed';
     private const FULL_BODY_FALLBACK_ID = 9;
 
+    // Misma fórmula y mismas constantes que `estimateCalories` en
+    // src/shared/utils/workoutStats.ts (frontend, usado por cliente/entrenador) —
+    // MET (equivalente metabólico) × peso(kg) × horas, escalando el MET según la
+    // densidad de volumen (repeticiones totales / minuto).
+    private const DEFAULT_BODY_WEIGHT_KG = 70.0;
+    private const MIN_TRAINING_MET = 3.5;
+    private const MAX_TRAINING_MET = 6.5;
+    private const MET_PER_REP_PER_MINUTE = 0.15;
+
     public function listRoutines(User $user): array
     {
         $this->resolveContext($user);
@@ -304,7 +313,7 @@ class OpenGymService
             'estado' => self::STATUS_COMPLETED,
             'fecha_fin' => $finishedAt,
             'duracion_segundos' => $duration,
-            'calorias_estimadas' => $this->estimateWorkoutCalories($workout, $completedSets),
+            'calorias_estimadas' => $this->estimateWorkoutCalories($workout, $completedSets, $duration),
             'dificultad_percibida' => $payload['dificultad_percibida'] ?? null,
             'resumen_prs' => $prs->map(fn(OpenGymWorkoutSet $set) => [
                 'ejercicio' => $set->nombre_ejercicio,
@@ -630,13 +639,39 @@ class OpenGymService
             ->all();
     }
 
-    private function estimateWorkoutCalories(OpenGymWorkout $workout, Collection $completedSets): int
+    /**
+     * Estima kcal quemadas con MET × peso(kg) × horas (mismo criterio que
+     * `estimateCalories` del cliente normal, ver constantes arriba). El peso usa el
+     * último registro real del cliente en la tabla `pesos` (la misma que ya llena
+     * cualquier cliente —incluido Open Gym— vía `POST /cliente/metricas`); si nunca
+     * registró uno, cae al peso de referencia, igual que el resto de la app.
+     */
+    private function estimateWorkoutCalories(OpenGymWorkout $workout, Collection $completedSets, int $durationSeconds): int
     {
         if ($workout->calorias_estimadas) {
             return (int) $workout->calorias_estimadas;
         }
 
-        return max(80, (int) ($completedSets->count() * 18));
+        $totalMinutes = $durationSeconds / 60;
+        if ($totalMinutes <= 0 || $completedSets->isEmpty()) {
+            return max(80, (int) ($completedSets->count() * 18));
+        }
+
+        $volume = (float) $completedSets->sum(
+            fn (OpenGymWorkoutSet $set) => (float) ($set->reps_realizadas ?? $set->reps_objetivo ?? 0),
+        );
+
+        $ultimoPeso = DB::table('pesos')
+            ->where('id_cliente', $workout->id_cliente)
+            ->orderByDesc('created_at')
+            ->value('peso');
+        $weightKg = $ultimoPeso !== null ? (float) $ultimoPeso : self::DEFAULT_BODY_WEIGHT_KG;
+
+        $density = $volume / $totalMinutes;
+        $met = min(self::MAX_TRAINING_MET, self::MIN_TRAINING_MET + $density * self::MET_PER_REP_PER_MINUTE);
+        $hours = $totalMinutes / 60;
+
+        return max(80, (int) round($met * $weightKg * $hours));
     }
 
     private function serializeHistoryItem(OpenGymWorkout $workout): array

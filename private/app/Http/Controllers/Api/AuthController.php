@@ -4,14 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\ResetPasswordAppMail;
+use App\Models\Clientes;
+use App\Models\EntrenadorPerfil;
 use App\Models\User;
 use App\Support\GymBranding;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 
@@ -124,6 +129,73 @@ class AuthController extends Controller
         $user->update(['password' => Hash::make($request->new_password)]);
 
         return response()->json(['message' => 'Contraseña actualizada correctamente.']);
+    }
+
+    /**
+     * Elimina la cuenta del usuario autenticado (requisito 5.1.1(v) de Apple:
+     * self-service account deletion). No se borra físicamente el registro de
+     * `clientes` porque varias tablas dependen de él sin CASCADE (pesos, imcs,
+     * puntos_clientes) y el gimnasio necesita conservar su historial contable —
+     * en vez de eso se anonimiza la información personal identificable y se
+     * desactiva el acceso: correo/CI/nombre se reemplazan por un valor no
+     * identificable, la clave se aleatoriza, se revocan todos los tokens y
+     * (para clientes) se marca `estado = 0`, el mismo campo que ya bloquea el
+     * login de clientes inactivos en este mismo controlador.
+     */
+    public function eliminarCuenta(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        if (! Hash::check($request->current_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['La contraseña actual es incorrecta.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($user) {
+            if ($user->id_cliente) {
+                $cliente = Clientes::find($user->id_cliente);
+                if ($cliente) {
+                    if ($cliente->foto_path) {
+                        Storage::disk('public')->delete($cliente->foto_path);
+                    }
+                    $cliente->update([
+                        'nombres' => 'Cliente eliminado',
+                        'paterno' => '',
+                        'materno' => null,
+                        'email' => "eliminado-{$cliente->id}@ampaya.cl",
+                        'telefono' => '-',
+                        'direccion' => null,
+                        'ciudad' => null,
+                        'ci' => 'ELIMINADO-' . $cliente->id,
+                        'foto_path' => null,
+                        'estado' => 0,
+                    ]);
+                }
+            }
+
+            $perfilEntrenador = EntrenadorPerfil::where('id_entrenador', $user->id)->first();
+            if ($perfilEntrenador) {
+                if ($perfilEntrenador->foto) {
+                    Storage::disk('public')->delete($perfilEntrenador->foto);
+                }
+                $perfilEntrenador->update(['instagram' => null, 'foto' => null]);
+            }
+
+            $user->tokens()->delete();
+            $user->update([
+                'name' => 'Usuario eliminado',
+                'email' => "eliminado-{$user->id}@ampaya.cl",
+                'password' => Hash::make(Str::random(40)),
+            ]);
+        });
+
+        return response()->json(['message' => 'Tu cuenta fue eliminada correctamente.']);
     }
 
     /**
