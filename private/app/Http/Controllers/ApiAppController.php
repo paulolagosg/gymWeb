@@ -2272,7 +2272,7 @@ class ApiAppController extends Controller
         }
 
         $usuarios = $usuariosQ
-            ->get(['users.id', 'users.name', 'users.email', 'users.id_tipo_usuario', 'users.titulo', 'users.porcentaje', 'users.slug', 'users.created_at', 'users.id_gimnasio', 'gimnasios.nombre as gimnasio'])
+            ->get(['users.id', 'users.name', 'users.email', 'users.id_tipo_usuario', 'users.titulo', 'users.porcentaje', 'users.individual', 'users.duo', 'users.slug', 'users.created_at', 'users.id_gimnasio', 'gimnasios.nombre as gimnasio'])
             ->map(fn($u) => [
                 'id' => (int) $u->id,
                 'name' => $u->name,
@@ -2280,6 +2280,8 @@ class ApiAppController extends Controller
                 'id_tipo_usuario' => (int) $u->id_tipo_usuario,
                 'titulo' => $u->titulo,
                 'porcentaje' => $u->porcentaje,
+                'individual' => $u->individual,
+                'duo' => $u->duo,
                 'slug' => $u->slug,
                 'created_at' => $u->created_at,
                 'id_gimnasio' => $u->id_gimnasio ? (int) $u->id_gimnasio : null,
@@ -2300,6 +2302,8 @@ class ApiAppController extends Controller
             'id_tipo_usuario' => 'required|integer|in:1,2,3,4,5',
             'titulo' => 'nullable|string|max:255',
             'porcentaje' => 'nullable|numeric',
+            'individual' => 'nullable|integer|min:0',
+            'duo' => 'nullable|integer|min:0',
         ]);
 
         $id = DB::table('users')->insertGetId([
@@ -2309,6 +2313,8 @@ class ApiAppController extends Controller
             'id_tipo_usuario' => $v['id_tipo_usuario'],
             'titulo' => $v['titulo'] ?? null,
             'porcentaje' => $v['porcentaje'] ?? null,
+            'individual' => $v['individual'] ?? null,
+            'duo' => $v['duo'] ?? null,
             'slug' => Str::slug($v['name']) . '-' . Str::random(6),
             'created_at' => now(),
             'updated_at' => now(),
@@ -2326,17 +2332,23 @@ class ApiAppController extends Controller
             'email' => "required|email|unique:users,email,{$id}",
             'id_tipo_usuario' => 'required|integer|in:1,2,3,4,5',
             'titulo' => 'nullable|string|max:255',
+            'individual' => 'nullable|integer|min:0',
+            'duo' => 'nullable|integer|min:0',
             'password' => 'nullable|string|min:6',
         ]);
 
         // 'porcentaje' ya no se edita desde esta pantalla — no se incluye en $data para
         // no sobreescribir con null la comisión ya guardada del entrenador (se sigue
-        // usando en DashboardController para la proyección de ingresos).
+        // usando en DashboardController para la proyección de ingresos). 'individual' y
+        // 'duo' sí se editan acá (tarifa por defecto para Pago de entrenadores), así que
+        // sí se sobreescriben con lo que venga en la petición.
         $data = [
             'name' => $v['name'],
             'email' => $v['email'],
             'id_tipo_usuario' => $v['id_tipo_usuario'],
             'titulo' => $v['titulo'] ?? null,
+            'individual' => $v['individual'] ?? null,
+            'duo' => $v['duo'] ?? null,
             'updated_at' => now(),
         ];
         if (! empty($v['password'])) $data['password'] = Hash::make($v['password']);
