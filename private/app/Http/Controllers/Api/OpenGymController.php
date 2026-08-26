@@ -114,6 +114,7 @@ class OpenGymController extends Controller
             'ejercicios' => ['required', 'array', 'min:1'],
             'ejercicios.*.id_ejercicio' => ['nullable', 'integer', 'exists:ejercicios,id'],
             'ejercicios.*.nombre' => ['nullable', 'string', 'max:120'],
+            'ejercicios.*.grupo_muscular' => ['nullable', 'string', 'max:100'],
             'ejercicios.*.series' => ['required', 'integer', 'min:1', 'max:20'],
             'ejercicios.*.reps' => ['required', 'integer', 'min:1', 'max:100'],
             'ejercicios.*.descanso_segundos' => ['nullable', 'integer', 'min:0', 'max:3600'],

@@ -31,6 +31,9 @@ class OpenGymService
     private const MAX_TRAINING_MET = 6.5;
     private const MET_PER_REP_PER_MINUTE = 0.15;
 
+    /** Caché local (por request) de GrupoMuscular resuelto por nombre — evita N+1. */
+    private array $grupoMuscularPorNombre = [];
+
     public function listRoutines(User $user): array
     {
         $this->resolveContext($user);
@@ -122,6 +125,7 @@ class OpenGymService
                 $routine->exercises()->create([
                     'id_ejercicio' => $exercise['id_ejercicio'] ?? null,
                     'nombre_personalizado' => isset($exercise['nombre']) ? trim((string) $exercise['nombre']) : null,
+                    'grupo_muscular' => isset($exercise['grupo_muscular']) ? trim((string) $exercise['grupo_muscular']) : null,
                     'notas' => isset($exercise['notas']) ? trim((string) $exercise['notas']) : null,
                     'orden' => $index + 1,
                     'series' => (int) ($exercise['series'] ?? 3),
@@ -159,6 +163,7 @@ class OpenGymService
                 $copy->exercises()->create([
                     'id_ejercicio' => $exercise->id_ejercicio,
                     'nombre_personalizado' => $exercise->nombre_personalizado,
+                    'grupo_muscular' => $exercise->grupo_muscular,
                     'notas' => $exercise->notas,
                     'orden' => $exercise->orden,
                     'series' => $exercise->series,
@@ -229,7 +234,7 @@ class OpenGymService
             ]);
 
             $routine->exercises->values()->each(function (OpenGymRoutineExercise $exercise, int $index) use ($workout) {
-                $group = $exercise->ejercicio?->tipo?->grupoMuscular;
+                $group = $this->resolveGrupoMuscular($exercise->ejercicio?->tipo?->grupoMuscular, $exercise->grupo_muscular);
                 $groupId = $group?->id ?? self::FULL_BODY_FALLBACK_ID;
 
                 for ($setNumber = 1; $setNumber <= (int) $exercise->series; $setNumber++) {
@@ -514,13 +519,14 @@ class OpenGymService
         }
 
         $base['ejercicios'] = $exercises->map(function (OpenGymRoutineExercise $exercise) {
-            $group = $exercise->ejercicio?->tipo?->grupoMuscular;
+            $catalogGroup = $exercise->ejercicio?->tipo?->grupoMuscular;
+            $group = $this->resolveGrupoMuscular($catalogGroup, $exercise->grupo_muscular);
 
             return [
                 'id' => (int) $exercise->id,
                 'id_ejercicio' => $exercise->id_ejercicio ? (int) $exercise->id_ejercicio : null,
                 'nombre' => $exercise->ejercicio?->nombre ?? $exercise->nombre_personalizado ?? 'Ejercicio personalizado',
-                'grupo_muscular' => $group?->nombre ?? 'Full Body',
+                'grupo_muscular' => $this->displayGrupoMuscularNombre($catalogGroup, $exercise->grupo_muscular),
                 'icono_grupo' => $group?->icono,
                 'color_grupo' => $group?->color,
                 'series' => (int) $exercise->series,
@@ -589,18 +595,54 @@ class OpenGymService
         ];
     }
 
+    /**
+     * Resuelve el grupo muscular de un ejercicio: prioriza el vínculo de catálogo
+     * (`id_ejercicio -> tipo -> grupoMuscular`, el mismo que usan los ejercicios de
+     * gimnasios/clientes presenciales); si no hay vínculo (ejercicio personalizado,
+     * como los de las plantillas de Open Gym), busca por nombre en el catálogo
+     * `grupos_musculares` usando el texto libre guardado. No crea filas nuevas en
+     * ningún catálogo — solo lee `grupos_musculares`, que ya existía.
+     */
+    private function resolveGrupoMuscular(?GrupoMuscular $catalogGroup, ?string $textoLibre): ?GrupoMuscular
+    {
+        if ($catalogGroup) {
+            return $catalogGroup;
+        }
+
+        $nombre = trim((string) $textoLibre);
+        if ($nombre === '') {
+            return null;
+        }
+
+        if (! array_key_exists($nombre, $this->grupoMuscularPorNombre)) {
+            $this->grupoMuscularPorNombre[$nombre] = GrupoMuscular::where('nombre', $nombre)->first();
+        }
+
+        return $this->grupoMuscularPorNombre[$nombre];
+    }
+
+    private function displayGrupoMuscularNombre(?GrupoMuscular $catalogGroup, ?string $textoLibre): string
+    {
+        $resuelto = $this->resolveGrupoMuscular($catalogGroup, $textoLibre);
+        if ($resuelto) {
+            return $resuelto->nombre;
+        }
+
+        $trimmed = trim((string) $textoLibre);
+        return $trimmed !== '' ? $trimmed : 'Full Body';
+    }
+
     private function buildRoutineMuscleBreakdown(Collection $exercises): array
     {
         $totalSeries = max(1, (int) $exercises->sum('series'));
 
         return $exercises
             ->groupBy(function (OpenGymRoutineExercise $exercise) {
-                $group = $exercise->ejercicio?->tipo?->grupoMuscular;
-                return $group?->nombre ?? 'Full Body';
+                return $this->displayGrupoMuscularNombre($exercise->ejercicio?->tipo?->grupoMuscular, $exercise->grupo_muscular);
             })
             ->map(function (Collection $groupedExercises, string $name) use ($totalSeries) {
                 $first = $groupedExercises->first();
-                $group = $first?->ejercicio?->tipo?->grupoMuscular;
+                $group = $this->resolveGrupoMuscular($first?->ejercicio?->tipo?->grupoMuscular, $first?->grupo_muscular);
                 $series = (int) $groupedExercises->sum('series');
 
                 return [
@@ -693,109 +735,345 @@ class OpenGymService
         ];
     }
 
+    /**
+     * 21 plantillas (7 grupos × 3 niveles) para clientes autoguiados sin entrenador
+     * presente: sin ejercicios que requieran observador, con máquinas priorizadas en
+     * nivel básico y progresión a peso libre en medio/avanzado. `nivel` alimenta el
+     * clasificador Básico/Medio/Avanzado del buscador de plantillas en la app.
+     */
     private function buildSuggestedTemplates(): array
     {
         return [
+            // ===================================================================
+            // CUERPO COMPLETO (FULL)
+            // ===================================================================
             [
-                'nombre' => 'Pierna Fuerte',
-                'descripcion' => 'Base para cuadriceps, gluteos y femorales.',
+                'nombre' => 'Cuerpo completo — Inicio',
+                'descripcion' => 'Circuito de máquinas para todo el cuerpo, ideal para empezar. 40–45 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Pierna', 'Espalda', 'Pecho', 'Hombro', 'Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Prensa 45°', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'No bloquear rodillas arriba.'],
+                    ['nombre' => 'Jalón al pecho en polea', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Llevar la barra al pecho, no a la nuca.'],
+                    ['nombre' => 'Press de pecho en máquina', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Codos a 45°, no pegados al torso.'],
+                    ['nombre' => 'Press de hombro en máquina', 'grupo_muscular' => 'Hombro', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl femoral tumbado', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Plancha frontal', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Sostén 20-30 segundos. Cadera alineada, sin arquear lumbar.'],
+                ],
+            ],
+            [
+                'nombre' => 'Cuerpo completo — Progresión',
+                'descripcion' => 'Progresión con mancuernas y barra para cuerpo completo. 55–60 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Pierna', 'Pecho', 'Espalda', 'Gluteos', 'Hombro', 'Brazos', 'Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Sentadilla goblet con mancuerna', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press banca con mancuernas', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Sin observador: usar mancuernas, no barra.'],
+                    ['nombre' => 'Remo con mancuerna a una mano', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => '10 repeticiones por lado.'],
+                    ['nombre' => 'Peso muerto rumano con barra', 'grupo_muscular' => 'Gluteos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Espalda neutra, recorrido hasta media espinilla.'],
+                    ['nombre' => 'Press de hombro con mancuernas sentado', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con extensión de tríceps en polea: sin descanso entre ambos.'],
+                    ['nombre' => 'Extensión de tríceps en polea', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl con barra Z.'],
+                    ['nombre' => 'Plancha frontal', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Sostén 45 segundos.'],
+                ],
+            ],
+            [
+                'nombre' => 'Cuerpo completo — Fuerza total',
+                'descripcion' => 'Fuerza total con barra: sentadilla, press y dominadas. 70–80 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Pierna', 'Pecho', 'Gluteos', 'Espalda', 'Hombro', 'Brazos', 'Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Sentadilla con barra', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 6, 'descanso_segundos' => 150, 'peso_objetivo' => null, 'notas' => 'Usar rack con pines de seguridad.'],
+                    ['nombre' => 'Press banca con barra', 'grupo_muscular' => 'Pecho', 'series' => 4, 'reps' => 6, 'descanso_segundos' => 150, 'peso_objetivo' => null, 'notas' => 'Solo en rack con topes si entrena solo.'],
+                    ['nombre' => 'Peso muerto rumano con barra', 'grupo_muscular' => 'Gluteos', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Dominadas (lastradas si domina 12)', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => 'Alternativa: jalón agarre neutro.'],
+                    ['nombre' => 'Press militar con barra de pie', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Remo con barra', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl martillo', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con fondos en banco: sin descanso entre ambos.'],
+                    ['nombre' => 'Fondos en banco', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl martillo.'],
+                    ['nombre' => 'Rueda abdominal (ab wheel)', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+
+            // ===================================================================
+            // PIERNAS (PIER)
+            // ===================================================================
+            [
+                'nombre' => 'Piernas — Máquinas',
+                'descripcion' => 'Piernas en máquinas, sin cargas libres. 40–45 min.',
+                'nivel' => 'basico',
                 'grupos' => ['Pierna', 'Gluteos'],
                 'ejercicios' => [
-                    [
-                        'nombre' => 'Sentadilla libre',
-                        'grupo_muscular' => 'Pierna',
-                        'series' => 4,
-                        'reps' => 8,
-                        'descanso_segundos' => 90,
-                        'peso_objetivo' => null,
-                        'notas' => 'Controla la bajada y mantén el core firme.',
-                    ],
-                    [
-                        'nombre' => 'Peso muerto rumano',
-                        'grupo_muscular' => 'Gluteos',
-                        'series' => 4,
-                        'reps' => 10,
-                        'descanso_segundos' => 75,
-                        'peso_objetivo' => null,
-                        'notas' => 'Busca tensión en femorales durante todo el recorrido.',
-                    ],
-                    [
-                        'nombre' => 'Zancadas caminando',
-                        'grupo_muscular' => 'Pierna',
-                        'series' => 3,
-                        'reps' => 12,
-                        'descanso_segundos' => 60,
-                        'peso_objetivo' => null,
-                        'notas' => 'Mantén pasos largos y estables.',
-                    ],
+                    ['nombre' => 'Prensa 45°', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Pies a la altura de los hombros.'],
+                    ['nombre' => 'Extensión de cuádriceps en máquina', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl femoral tumbado', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Sentadilla goblet con mancuerna', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Bajar hasta donde controle la espalda.'],
+                    ['nombre' => 'Elevación de talones de pie', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Pausa de 1 s arriba.'],
+                    ['nombre' => 'Abducción de cadera en máquina', 'grupo_muscular' => 'Gluteos', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
                 ],
             ],
             [
-                'nombre' => 'Push',
-                'descripcion' => 'Empuje para pecho, hombro y triceps.',
-                'grupos' => ['Pecho', 'Hombro', 'Brazos'],
+                'nombre' => 'Piernas — Peso libre',
+                'descripcion' => 'Piernas con sentadilla y peso muerto con barra. 60–65 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Pierna', 'Gluteos'],
                 'ejercicios' => [
-                    [
-                        'nombre' => 'Press de banca',
-                        'grupo_muscular' => 'Pecho',
-                        'series' => 4,
-                        'reps' => 8,
-                        'descanso_segundos' => 90,
-                        'peso_objetivo' => null,
-                        'notas' => 'Pausa breve en el pecho y sube con control.',
-                    ],
-                    [
-                        'nombre' => 'Press militar',
-                        'grupo_muscular' => 'Hombro',
-                        'series' => 4,
-                        'reps' => 10,
-                        'descanso_segundos' => 75,
-                        'peso_objetivo' => null,
-                        'notas' => 'Evita arquear la espalda en exceso.',
-                    ],
-                    [
-                        'nombre' => 'Fondos en paralelas',
-                        'grupo_muscular' => 'Brazos',
-                        'series' => 3,
-                        'reps' => 12,
-                        'descanso_segundos' => 60,
-                        'peso_objetivo' => null,
-                        'notas' => 'Mantén hombros estables y codos cerca del cuerpo.',
-                    ],
+                    ['nombre' => 'Sentadilla con barra', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => 'Rack con pines de seguridad.'],
+                    ['nombre' => 'Peso muerto rumano con barra', 'grupo_muscular' => 'Gluteos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Prensa 45°', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Zancadas caminando con mancuernas', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => '10 repeticiones por pierna.'],
+                    ['nombre' => 'Curl femoral sentado', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Extensión de cuádriceps', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Elevación de talones de pie', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 12, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
                 ],
             ],
             [
-                'nombre' => 'Cardio + Core',
-                'descripcion' => 'Circuito corto para cardio y abdomen.',
-                'grupos' => ['Cardio', 'Core'],
+                'nombre' => 'Piernas — Volumen y fuerza',
+                'descripcion' => 'Volumen y fuerza para piernas y glúteos. 75–85 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Pierna', 'Gluteos'],
                 'ejercicios' => [
-                    [
-                        'nombre' => 'Remo ergómetro',
-                        'grupo_muscular' => 'Cardio',
-                        'series' => 3,
-                        'reps' => 8,
-                        'descanso_segundos' => 45,
-                        'peso_objetivo' => null,
-                        'notas' => 'Trabaja por intervalos intensos de un minuto.',
-                    ],
-                    [
-                        'nombre' => 'Plancha frontal',
-                        'grupo_muscular' => 'Core',
-                        'series' => 4,
-                        'reps' => 1,
-                        'descanso_segundos' => 30,
-                        'peso_objetivo' => null,
-                        'notas' => 'Sostén entre 30 y 45 segundos por serie.',
-                    ],
-                    [
-                        'nombre' => 'Mountain climbers',
-                        'grupo_muscular' => 'Core',
-                        'series' => 3,
-                        'reps' => 20,
-                        'descanso_segundos' => 30,
-                        'peso_objetivo' => null,
-                        'notas' => 'Mantén una cadencia constante sin perder técnica.',
-                    ],
+                    ['nombre' => 'Sentadilla con barra', 'grupo_muscular' => 'Pierna', 'series' => 5, 'reps' => 5, 'descanso_segundos' => 165, 'peso_objetivo' => null, 'notas' => 'RPE 8, dejar 2 reps en reserva.'],
+                    ['nombre' => 'Peso muerto rumano con barra', 'grupo_muscular' => 'Gluteos', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Hack squat o prensa 45°', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Última serie en dropset (-30%).'],
+                    ['nombre' => 'Sentadilla búlgara con mancuernas', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => '8 repeticiones por pierna.'],
+                    ['nombre' => 'Hip thrust con barra', 'grupo_muscular' => 'Gluteos', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Barra almohadillada.'],
+                    ['nombre' => 'Curl femoral tumbado', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Tempo 2-1-2.'],
+                    ['nombre' => 'Extensión de cuádriceps', 'grupo_muscular' => 'Pierna', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Última serie rest-pause.'],
+                    ['nombre' => 'Elevación de talones en prensa', 'grupo_muscular' => 'Pierna', 'series' => 4, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+
+            // ===================================================================
+            // PECHO (PECH)
+            // ===================================================================
+            [
+                'nombre' => 'Pecho — Máquinas',
+                'descripcion' => 'Pecho en máquinas y mancuernas, base segura. 35–40 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Pecho'],
+                'ejercicios' => [
+                    ['nombre' => 'Press de pecho en máquina', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press inclinado con mancuernas', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Banco a 30°.'],
+                    ['nombre' => 'Aperturas en peck-deck', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Flexiones de brazos (rodillas o inclinadas)', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Máximo con buena técnica.'],
+                    ['nombre' => 'Cruce de poleas desde abajo', 'grupo_muscular' => 'Pecho', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Pecho — Banca y ángulos',
+                'descripcion' => 'Banca con barra y ángulos variados de pecho. 50–55 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Pecho'],
+                'ejercicios' => [
+                    ['nombre' => 'Press banca con barra', 'grupo_muscular' => 'Pecho', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => 'En rack con topes si no hay observador.'],
+                    ['nombre' => 'Press inclinado con mancuernas', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Fondos en paralelas (asistidos si hace falta)', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Torso inclinado adelante.'],
+                    ['nombre' => 'Cruce de poleas desde arriba', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Peck-deck', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Flexiones de brazos', 'grupo_muscular' => 'Pecho', 'series' => 1, 'reps' => 15, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Serie final al fallo técnico.'],
+                ],
+            ],
+            [
+                'nombre' => 'Pecho — Fuerza e intensidad',
+                'descripcion' => 'Fuerza e intensidad para pecho, con superseries. 65–70 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Pecho'],
+                'ejercicios' => [
+                    ['nombre' => 'Press banca con barra', 'grupo_muscular' => 'Pecho', 'series' => 5, 'reps' => 5, 'descanso_segundos' => 180, 'peso_objetivo' => null, 'notas' => 'RPE 8.'],
+                    ['nombre' => 'Press inclinado con barra', 'grupo_muscular' => 'Pecho', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Fondos lastrados', 'grupo_muscular' => 'Pecho', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press declinado en máquina', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Cruce de poleas', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con flexiones al máximo, sin descanso entre ambos (3 rondas).'],
+                    ['nombre' => 'Flexiones de brazos', 'grupo_muscular' => 'Pecho', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con cruce de poleas, al máximo.'],
+                    ['nombre' => 'Peck-deck', 'grupo_muscular' => 'Pecho', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Dropset de -25% en la última serie.'],
+                ],
+            ],
+
+            // ===================================================================
+            // ESPALDA (ESPA)
+            // ===================================================================
+            [
+                'nombre' => 'Espalda — Poleas y máquinas',
+                'descripcion' => 'Espalda en poleas y máquinas, técnica simple. 35–40 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Espalda'],
+                'ejercicios' => [
+                    ['nombre' => 'Jalón al pecho en polea', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Remo sentado en polea baja', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Sin balancear el torso.'],
+                    ['nombre' => 'Remo en máquina con apoyo pectoral', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Pull-over en polea alta', 'grupo_muscular' => 'Espalda', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Extensiones lumbares en banco romano', 'grupo_muscular' => 'Espalda', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Sin hiperextender.'],
+                ],
+            ],
+            [
+                'nombre' => 'Espalda — Remos y dominadas',
+                'descripcion' => 'Remos y dominadas para espalda media. 55–60 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Espalda'],
+                'ejercicios' => [
+                    ['nombre' => 'Dominadas asistidas (o jalón agarre supino)', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Remo con barra', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => 'Torso a 45°, espalda neutra.'],
+                    ['nombre' => 'Remo con mancuerna a una mano', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Por lado.'],
+                    ['nombre' => 'Jalón en polea agarre neutro', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Face pull en polea', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Extensiones lumbares en banco romano', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Espalda — Fuerza y densidad',
+                'descripcion' => 'Fuerza y densidad con peso muerto y dominadas lastradas. 70–75 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Espalda'],
+                'ejercicios' => [
+                    ['nombre' => 'Peso muerto convencional', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 5, 'descanso_segundos' => 180, 'peso_objetivo' => null, 'notas' => 'Técnica antes que carga.'],
+                    ['nombre' => 'Dominadas lastradas', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 6, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Remo con barra Pendlay', 'grupo_muscular' => 'Espalda', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Remo en T o remo en máquina', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Jalón agarre cerrado neutro', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Pull-over en polea alta', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Última serie en dropset.'],
+                    ['nombre' => 'Encogimientos con mancuernas', 'grupo_muscular' => 'Espalda', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Pausa de 1 s arriba.'],
+                ],
+            ],
+
+            // ===================================================================
+            // HOMBROS (HOMB)
+            // ===================================================================
+            [
+                'nombre' => 'Hombros — Iniciación',
+                'descripcion' => 'Hombros con máquinas, ideal para iniciar. 30–35 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Hombro'],
+                'ejercicios' => [
+                    ['nombre' => 'Press de hombro en máquina', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Elevaciones laterales con mancuernas', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Carga liviana, sin impulso.'],
+                    ['nombre' => 'Elevaciones frontales con mancuernas', 'grupo_muscular' => 'Hombro', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Deltoides posterior en peck-deck invertido', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Face pull en polea', 'grupo_muscular' => 'Hombro', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Hombros — Tres cabezas',
+                'descripcion' => 'Trabajo de las tres cabezas del hombro. 45–50 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Hombro'],
+                'ejercicios' => [
+                    ['nombre' => 'Press militar con mancuernas sentado', 'grupo_muscular' => 'Hombro', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Elevaciones laterales con mancuernas', 'grupo_muscular' => 'Hombro', 'series' => 4, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press Arnold', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Deltoides posterior en peck-deck invertido', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Face pull en polea', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Encogimientos con mancuernas', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Hombros — Volumen lateral',
+                'descripcion' => 'Volumen lateral de hombro con dropsets. 60–65 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Hombro'],
+                'ejercicios' => [
+                    ['nombre' => 'Press militar con barra de pie', 'grupo_muscular' => 'Hombro', 'series' => 5, 'reps' => 5, 'descanso_segundos' => 150, 'peso_objetivo' => null, 'notas' => 'Core apretado, sin arquear lumbar.'],
+                    ['nombre' => 'Press con mancuernas sentado', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Elevaciones laterales con mancuernas', 'grupo_muscular' => 'Hombro', 'series' => 4, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Última serie con triple dropset.'],
+                    ['nombre' => 'Elevación lateral en polea a una mano', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Por lado.'],
+                    ['nombre' => 'Deltoides posterior en poleas cruzadas', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Face pull en polea', 'grupo_muscular' => 'Hombro', 'series' => 3, 'reps' => 20, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Encogimientos con barra', 'grupo_muscular' => 'Hombro', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+
+            // ===================================================================
+            // BRAZOS (BRAZ)
+            // ===================================================================
+            [
+                'nombre' => 'Brazos — Iniciación',
+                'descripcion' => 'Bíceps y tríceps con máquinas y mancuernas. 30–35 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Brazos'],
+                'ejercicios' => [
+                    ['nombre' => 'Curl con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Codos fijos al costado.'],
+                    ['nombre' => 'Curl martillo con mancuernas', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Extensión de tríceps en polea con cuerda', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press francés con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl en banco predicador (máquina)', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Brazos — Bíceps y tríceps',
+                'descripcion' => 'Bíceps y tríceps con barra y superserie final. 45–50 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Brazos'],
+                'ejercicios' => [
+                    ['nombre' => 'Curl con barra recta', 'grupo_muscular' => 'Brazos', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl inclinado con mancuernas', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Banco a 45°.'],
+                    ['nombre' => 'Curl martillo', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press cerrado en banca', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Press francés con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Extensión de tríceps en polea con cuerda', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Curl en polea', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con tríceps en polea, sin descanso entre ambos (2 rondas).'],
+                    ['nombre' => 'Tríceps en polea', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl en polea.'],
+                ],
+            ],
+            [
+                'nombre' => 'Brazos — Superseries',
+                'descripcion' => 'Superseries intensas de brazos por bloques. 55–60 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Brazos'],
+                'ejercicios' => [
+                    ['nombre' => 'Curl con barra', 'grupo_muscular' => 'Brazos', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con press cerrado en banca, sin descanso entre ambos.'],
+                    ['nombre' => 'Press cerrado en banca', 'grupo_muscular' => 'Brazos', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 120, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl con barra.'],
+                    ['nombre' => 'Curl inclinado con mancuernas', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con press francés, sin descanso entre ambos.'],
+                    ['nombre' => 'Press francés con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 90, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl inclinado.'],
+                    ['nombre' => 'Curl martillo con cuerda', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 0, 'peso_objetivo' => null, 'notas' => 'Superserie con extensión de tríceps en polea, sin descanso entre ambos.'],
+                    ['nombre' => 'Extensión de tríceps en polea', 'grupo_muscular' => 'Brazos', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Segunda mitad de la superserie con curl martillo con cuerda.'],
+                    ['nombre' => 'Curl 21s con barra Z', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 21, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => '21 repeticiones: 7 parciales inferiores + 7 parciales superiores + 7 completas.'],
+                    ['nombre' => 'Tríceps en máquina', 'grupo_muscular' => 'Brazos', 'series' => 2, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Incluye dropset al final de cada serie.'],
+                ],
+            ],
+
+            // ===================================================================
+            // CORE
+            // ===================================================================
+            [
+                'nombre' => 'Core — Estabilidad',
+                'descripcion' => 'Estabilidad de core, ideal para empezar. 20 min.',
+                'nivel' => 'basico',
+                'grupos' => ['Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Plancha frontal', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Sostener 20-30 segundos.'],
+                    ['nombre' => 'Puente de glúteos en colchoneta', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Crunch abdominal', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Sin tirar del cuello.'],
+                    ['nombre' => 'Dead bug', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 10, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Por lado. Lumbar pegada al suelo.'],
+                    ['nombre' => 'Plancha lateral', 'grupo_muscular' => 'Core', 'series' => 2, 'reps' => 1, 'descanso_segundos' => 30, 'peso_objetivo' => null, 'notas' => 'Sostener 20 segundos por lado.'],
+                ],
+            ],
+            [
+                'nombre' => 'Core — Fuerza abdominal',
+                'descripcion' => 'Fuerza abdominal con carga y antirrotación. 25–30 min.',
+                'nivel' => 'medio',
+                'grupos' => ['Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Plancha frontal', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Sostener 45-60 segundos.'],
+                    ['nombre' => 'Elevación de piernas en paralelas', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Sin balanceo.'],
+                    ['nombre' => 'Crunch en polea alta arrodillado', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Giro ruso con disco', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 20, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => '20 repeticiones totales.'],
+                    ['nombre' => 'Plancha lateral con elevación de cadera', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 45, 'peso_objetivo' => null, 'notas' => 'Por lado.'],
+                    ['nombre' => 'Rueda abdominal de rodillas', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                ],
+            ],
+            [
+                'nombre' => 'Core — Avanzado',
+                'descripcion' => 'Core avanzado con colgado en barra y carga. 35–40 min.',
+                'nivel' => 'avanzado',
+                'grupos' => ['Core'],
+                'ejercicios' => [
+                    ['nombre' => 'Rueda abdominal (rodillas o de pie)', 'grupo_muscular' => 'Core', 'series' => 4, 'reps' => 8, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Elevación de piernas colgado en barra', 'grupo_muscular' => 'Core', 'series' => 4, 'reps' => 10, 'descanso_segundos' => 75, 'peso_objetivo' => null, 'notas' => 'Progresar a toes-to-bar.'],
+                    ['nombre' => 'Crunch en polea alta', 'grupo_muscular' => 'Core', 'series' => 4, 'reps' => 15, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Tempo 2-1-2.'],
+                    ['nombre' => 'Pallof press en polea', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 12, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Por lado. Antirrotación, sin girar la cadera.'],
+                    ['nombre' => 'Plancha lastrada con disco', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Sostener 45 segundos con disco sobre la espalda.'],
+                    ['nombre' => 'Limpiaparabrisas (windshield wipers)', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 8, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => null],
+                    ['nombre' => 'Farmer carry con mancuernas', 'grupo_muscular' => 'Core', 'series' => 3, 'reps' => 1, 'descanso_segundos' => 60, 'peso_objetivo' => null, 'notas' => 'Caminar 40 metros por serie.'],
                 ],
             ],
         ];

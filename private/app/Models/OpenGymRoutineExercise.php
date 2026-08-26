@@ -12,6 +12,7 @@ class OpenGymRoutineExercise extends Model
         'id_rutina',
         'id_ejercicio',
         'nombre_personalizado',
+        'grupo_muscular',
         'notas',
         'orden',
         'series',
