@@ -187,7 +187,7 @@
         <div class="section">
             <h3>Evolución del % de Masa Ósea</h3>
             <div class="chart-container">
-                <img src="{{ $chartGrasaUrl }}"
+                <img src="{{ $chartPoseaUrl }}"
                     alt="Gráfico de % de masa Ósea"
                     class="chart-img">
             </div>
@@ -273,76 +273,19 @@
             </table>
         </div>
 
-        {{-- Cuenta Corriente --}}
+        {{-- Evolución de carga por ejercicio --}}
         <div class="section">
-            <h3>Cuenta Corriente</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Vencimiento</th>
-                        <th>Monto</th>
-                        <th>Pagado</th>
-                        <th>Fecha Pago</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($cuotas as $c)
-                    <tr>
-                        <td style="text-align: center;">{{ \Carbon\Carbon::parse($c->fecha_vencimiento)->format('d/m/Y') }}</td>
-                        <td style="text-align: right;">${{ number_format($c->monto, 0, ',', '.') }}</td>
-                        <td style="text-align: right;">${{ number_format($c->monto_pagado, 0, ',', '.') }}</td>
-                        <td style="text-align: center;">{{ $c->fecha_pago }}</td>
-                        <td>{{ $c->id_estado_pago == 2 ? 'Pagada' : 'Pendiente' }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-
-        {{-- PAR-Q --}}
-        <div class="section">
-            <h3>Cuestionario PAR-Q</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($parq as $r)
-                    <tr>
-                        <td>{{ $r->pregunta->pregunta }}</td>
-                        <td style="text-align: center;">{{ $r->respuesta ? 'Sí' : 'No' }}
-                            @if($r->observaciones)
-                            <br><em><strong>Obs:</strong> {{ $r->observaciones }}</em>
-                            @endif
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-
-        {{-- Fit plan--}}
-        <div class="section">
-            <h3>Cuestionario Acondicionamiento Físico</h3>
-            @if($fitPlan)
-            <table>
-                <tbody>
-                    <tr>
-                        <td><strong>Alergias, enfermedades patológicas conocidas</strong></td>
-                        <td>{{ $fitPlan->patologias }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Intolerancias Alimentarias</strong></td>
-                        <td>{{ $fitPlan->intolerancias }}</td>
-                    </tr>
-                    <!-- ... resto de las filas ... -->
-                </tbody>
-            </table>
-            @endif
+            <h3>Evolución de Carga por Ejercicio</h3>
+            @forelse($exerciseCharts as $chart)
+            <div class="chart-container">
+                <p style="font-weight: bold; margin-bottom: 4px;">{{ $chart['nombre'] }}</p>
+                <img src="{{ $chart['carga_url'] }}"
+                    alt="Carga - {{ $chart['nombre'] }}"
+                    class="chart-img">
+            </div>
+            @empty
+            <p>Sin historial de cargas registrado.</p>
+            @endforelse
         </div>
     </main>
 

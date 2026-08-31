@@ -1569,14 +1569,12 @@ class ClientesController extends Controller
         // Repite la carga de datos igual que en reporte()
         $pesos = $cliente->pesos()->orderBy('created_at')->get();
         $imcs = $cliente->imcs()->orderBy('created_at')->get();
-        $cuotas = $cliente->cuotas()->orderBy('fecha_vencimiento')->get();
-        $parq = \App\Models\ParqRespuestas::where('id_cliente', $cliente->id)->with('pregunta')->get();
         $aguas = $cliente->aguas()->orderBy('created_at')->get();
         $grasas = $cliente->grasas()->orderBy('created_at')->get();
         $posea = $cliente->poseas()->orderBy('created_at')->get();
         $pmuscular = $cliente->pmusculares()->orderBy('created_at')->get();
         $perimetros = $cliente->perimetros()->orderBy('created_at')->get();
-        $fitPlan = $cliente->cuestionarios()->where('id_cliente', $cliente->id)->first();
+        $exerciseCharts = $this->buildExerciseLoadCharts($cliente);
 
         $pesoLabels = $pesos->pluck('created_at')->map(fn($d) => $d->format('d/m/Y'))->values();
         $pesoData = $pesos->pluck('peso')->values();
@@ -1851,14 +1849,12 @@ class ClientesController extends Controller
             'cliente',
             'pesos',
             'imcs',
-            'cuotas',
-            'parq',
-            'fitPlan',
             'aguas',
             'grasas',
             'posea',
             'pmuscular',
             'perimetros',
+            'exerciseCharts',
             'chartPesoUrl',
             'chartimcsUrl',
             'chartAguaUrl',
@@ -1998,6 +1994,76 @@ class ClientesController extends Controller
         }
     }
 
+    private function buildExerciseLoadCharts(Clientes $cliente): array
+    {
+        $agendas = Agendas::where('id_cliente', $cliente->id)
+            ->where('estado', 4)
+            ->with(['ejercicios' => function ($query) {
+                $query->orderBy('nombre', 'asc');
+            }])
+            ->orderBy('fecha_inicio', 'asc')
+            ->get();
+
+        $datosEjercicios = [];
+        foreach ($agendas as $agenda) {
+            foreach ($agenda->ejercicios as $ejercicio) {
+                $carga = $ejercicio->pivot->carga;
+                if (!isset($datosEjercicios[$ejercicio->nombre])) {
+                    $datosEjercicios[$ejercicio->nombre] = [
+                        'id_ejercicio' => $ejercicio->id,
+                        'fechas' => [],
+                        'cargas' => [],
+                        'repeticiones' => [],
+                    ];
+                }
+                $fecha = $agenda->fecha_inicio->format('Y-m-d');
+                if (!in_array($fecha, $datosEjercicios[$ejercicio->nombre]['fechas'])) {
+                    $datosEjercicios[$ejercicio->nombre]['fechas'][] = $fecha;
+                    $datosEjercicios[$ejercicio->nombre]['cargas'][] = (float)$carga ?? 0;
+                    $datosEjercicios[$ejercicio->nombre]['repeticiones'][] = $ejercicio->pivot->repeticiones ?? 0;
+                }
+            }
+        }
+
+        $charts = [];
+        foreach ($datosEjercicios as $nombre => $datos) {
+            $labels = array_map(function ($d) {
+                return \Carbon\Carbon::createFromFormat('Y-m-d', $d)->format('d/m/Y');
+            }, $datos['fechas']);
+
+            $configCarga = [
+                'type' => 'bar',
+                'data' => [
+                    'labels' => $labels,
+                    'datasets' => [[
+                        'label' => 'Carga (kg)',
+                        'data' => $datos['cargas'],
+                        'backgroundColor' => 'rgba(59,130,246,0.8)',
+                        'borderColor' => 'rgba(59,130,246,1)',
+                        'borderWidth' => 1,
+                    ]]
+                ],
+                'options' => [
+                    'plugins' => ['legend' => ['display' => false]],
+                    'scales' => ['y' => ['beginAtZero' => true]]
+                ]
+            ];
+
+            $chartCargaUrl = 'https://quickchart.io/chart?width=800&height=400&c=' . urlencode(json_encode($configCarga));
+
+            $charts[] = [
+                'nombre' => $nombre,
+                'carga_url' => $chartCargaUrl,
+            ];
+        }
+
+        usort($charts, function ($a, $b) {
+            return strcmp($a['nombre'], $b['nombre']);
+        });
+
+        return $charts;
+    }
+
     public function evolucionEjercicios($slug)
     {
         $cliente = Clientes::with('plan')->where('slug', $slug)->firstOrFail();
@@ -2064,94 +2130,7 @@ class ClientesController extends Controller
     {
         $cliente = Clientes::where('slug', $slug)->firstOrFail();
 
-        // Reutilizar la lógica para obtener los datos agrupados por ejercicio
-        $agendas = Agendas::where('id_cliente', $cliente->id)
-            ->where('estado', 4)
-            ->with(['ejercicios' => function ($query) {
-                $query->orderBy('nombre', 'asc');
-            }])
-            ->orderBy('fecha_inicio', 'asc')
-            ->get();
-
-        $datosEjercicios = [];
-        foreach ($agendas as $agenda) {
-            foreach ($agenda->ejercicios as $ejercicio) {
-                $carga = $ejercicio->pivot->carga;
-                if (!isset($datosEjercicios[$ejercicio->nombre])) {
-                    $datosEjercicios[$ejercicio->nombre] = [
-                        'id_ejercicio' => $ejercicio->id,
-                        'fechas' => [],
-                        'cargas' => [],
-                        'repeticiones' => [],
-                    ];
-                }
-                $fecha = $agenda->fecha_inicio->format('Y-m-d');
-                if (!in_array($fecha, $datosEjercicios[$ejercicio->nombre]['fechas'])) {
-                    $datosEjercicios[$ejercicio->nombre]['fechas'][] = $fecha;
-                    $datosEjercicios[$ejercicio->nombre]['cargas'][] = (float)$carga ?? 0;
-                    $datosEjercicios[$ejercicio->nombre]['repeticiones'][] = $ejercicio->pivot->repeticiones ?? 0;
-                }
-            }
-        }
-
-        // Generar URLs de QuickChart para cada ejercicio (solo gráficos, sin tablas)
-        $charts = [];
-        foreach ($datosEjercicios as $nombre => $datos) {
-            $labels = array_map(function ($d) {
-                return \Carbon\Carbon::createFromFormat('Y-m-d', $d)->format('d/m/Y');
-            }, $datos['fechas']);
-
-            $configCarga = [
-                'type' => 'line',
-                'data' => [
-                    'labels' => $labels,
-                    'datasets' => [[
-                        'label' => 'Carga (kg)',
-                        'data' => $datos['cargas'],
-                        'borderColor' => 'rgba(59,130,246,1)',
-                        'backgroundColor' => 'rgba(59,130,246,0.1)',
-                        'fill' => false,
-                        'tension' => 0.4,
-                    ]]
-                ],
-                'options' => [
-                    'plugins' => ['legend' => ['display' => false]],
-                    'scales' => ['y' => ['beginAtZero' => true]]
-                ]
-            ];
-
-            $configReps = [
-                'type' => 'bar',
-                'data' => [
-                    'labels' => $labels,
-                    'datasets' => [[
-                        'label' => 'Repeticiones',
-                        'data' => $datos['repeticiones'],
-                        'backgroundColor' => 'rgba(16,185,129,0.8)',
-                        'borderColor' => 'rgba(16,185,129,1)',
-                        'borderWidth' => 1
-                    ]]
-                ],
-                'options' => [
-                    'plugins' => ['legend' => ['display' => false]],
-                    'scales' => ['y' => ['beginAtZero' => true]]
-                ]
-            ];
-
-            $chartCargaUrl = 'https://quickchart.io/chart?width=800&height=400&c=' . urlencode(json_encode($configCarga));
-            //$chartRepsUrl = 'https://quickchart.io/chart?width=800&height=400&c=' . urlencode(json_encode($configReps));
-
-            $charts[] = [
-                'nombre' => $nombre,
-                'carga_url' => $chartCargaUrl,
-                //'reps_url' => $chartRepsUrl,
-            ];
-        }
-
-        // Ordenar por nombre
-        usort($charts, function ($a, $b) {
-            return strcmp($a['nombre'], $b['nombre']);
-        });
+        $charts = $this->buildExerciseLoadCharts($cliente);
 
         $pdf = Pdf::loadView('clientes.evolucion_ejercicios_pdf', compact('cliente', 'charts'))
             ->setOptions(['isRemoteEnabled' => true]);
