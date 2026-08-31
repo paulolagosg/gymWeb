@@ -1190,8 +1190,8 @@ class ApiAppController extends Controller
 
         $total = (clone $query)->count('clientes.id');
         $items = $query
-            ->orderBy('clientes.paterno')
             ->orderBy('clientes.nombres')
+            ->orderBy('clientes.paterno')
             ->forPage($page, $perPage)
             ->get();
 
