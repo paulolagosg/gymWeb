@@ -93,7 +93,7 @@
 
 <body>
     <header>
-        <img src="https://static.wixstatic.com/media/6d10e7_ec01ef38f649435295345bd8aa178ff9~mv2.png/v1/fill/w_169,h_89,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Logo%20MAX%202023.png"
+        <img src="{{ rtrim(config('app.url'), '/') }}/logo.png"
             alt="Logo"
             style="max-width: 180px; margin-bottom: 16px;">
     </header>
