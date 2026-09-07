@@ -103,6 +103,9 @@ class ClasesController extends Controller
         if ($request->filled('hasta')) {
             $query->where('fecha_inicio', '<=', Carbon::parse($request->query('hasta'))->endOfDay());
         }
+        if ($request->filled('id_usuario')) {
+            $query->where('id_usuario', (int) $request->query('id_usuario'));
+        }
 
         $clases = $query->get()->map(fn (Clases $clase) => $this->serializeClase($clase))->values();
 
