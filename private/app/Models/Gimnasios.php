@@ -58,6 +58,7 @@ class Gimnasios extends Model
         'reporte_pdf',
         'reporte_agendas',
         'pagos_entrenadores',
+        'reservas_clases',
     ];
 
     /**

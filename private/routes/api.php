@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\OpenGymController;
 use App\Http\Controllers\Api\TermsAndConditionsController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\Api\PlanesAlimentacionController;
+use App\Http\Controllers\Api\ClasesController;
 use App\Http\Controllers\ApiAppController;
 use Illuminate\Support\Facades\Route;
 
@@ -240,6 +241,15 @@ Route::prefix('app')->group(function () {
                 Route::delete('/pagos-entrenadores/{id}',     [ApiAppController::class, 'adminPagosEntrenadoresDestroy']);
             });
 
+            // Clases grupales con aforo
+            Route::middleware('feature:reservas_clases')->group(function () {
+                Route::get('/clases',                     [ClasesController::class, 'adminIndex']);
+                Route::post('/clases',                    [ClasesController::class, 'adminStore']);
+                Route::post('/clases/{id}/cancelar',      [ClasesController::class, 'adminCancelar']);
+                Route::get('/clases/{id}/roster',         [ClasesController::class, 'adminRoster']);
+                Route::post('/clases/{id}/reservar-manual', [ClasesController::class, 'adminReservarManual']);
+            });
+
             // Evaluaciones
             Route::get('/evaluaciones/resumen',          [ApiAppController::class, 'adminEvaluacionesResumen']);
             Route::get('/evaluaciones/mis-evaluaciones', [ApiAppController::class, 'adminMisEvaluaciones']);
@@ -285,6 +295,12 @@ Route::prefix('app')->group(function () {
             Route::post('/encuesta/entrenador',      [ApiAppController::class, 'clienteEncuestaEntrenadorStore'])->middleware('feature:encuestas');
             Route::get('/encuesta/gimnasio',         [ApiAppController::class, 'clienteEncuestaGimnasioIndex']);
             Route::post('/encuesta/gimnasio',        [ApiAppController::class, 'clienteEncuestaGimnasioStore'])->middleware('feature:encuestas');
+
+            Route::middleware('feature:reservas_clases')->group(function () {
+                Route::get('/clases',                        [ClasesController::class, 'clienteIndex']);
+                Route::post('/clases/{id}/reservar',          [ClasesController::class, 'clienteReservar']);
+                Route::post('/clases/{id}/cancelar-reserva',  [ClasesController::class, 'clienteCancelarReserva']);
+            });
 
             Route::get('/open-gym/rutinas',                    [OpenGymController::class, 'routinesIndex']);
             Route::get('/open-gym/catalogo-ejercicios',        [OpenGymController::class, 'catalogExercises']);
