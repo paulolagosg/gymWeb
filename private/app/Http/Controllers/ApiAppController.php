@@ -948,6 +948,7 @@ class ApiAppController extends Controller
                 'estado' => $s->estado !== null ? (int) $s->estado : null,
                 'descripcion' => $s->descripcion,
                 'id_cliente' => (int) $s->id_cliente,
+                'id_usuario' => $s->id_usuario ? (int) $s->id_usuario : null,
                 'cliente_nombre' => $s->cliente_nombre,
                 'cliente_slug' => $s->cliente_slug,
                 'entrenador_nombre' => $s->entrenador_nombre,
@@ -1302,6 +1303,82 @@ class ApiAppController extends Controller
             'total' => $total,
             'page' => $page,
             'per_page' => $perPage,
+        ]);
+    }
+
+    public function adminClientesExportar(Request $request): JsonResponse
+    {
+        if ($err = $this->requireAdmin($request)) return $err;
+
+        $esSuperAdmin = (int) $request->user()->id_tipo_usuario === 10;
+        $idGimnasio = $esSuperAdmin
+            ? max(0, (int) $request->query('id_gimnasio', 0))
+            : (int) ($request->user()->id_gimnasio ?? 0);
+
+        $query = DB::table('clientes')
+            ->leftJoin('planes', 'clientes.id_plan', '=', 'planes.id')
+            ->leftJoin('gimnasios', 'clientes.id_gimnasio', '=', 'gimnasios.id')
+            ->select(
+                'clientes.id',
+                'clientes.nombres',
+                'clientes.paterno',
+                'clientes.materno',
+                'clientes.ci',
+                'clientes.email',
+                'clientes.telefono',
+                'clientes.estado',
+                'clientes.fecha_ingreso',
+                'clientes.fecha_fin',
+                'planes.nombre as plan_nombre',
+                'gimnasios.nombre as gimnasio_nombre'
+            );
+
+        // Mismo scoping que adminClientesIndex(): un admin solo exporta su
+        // gimnasio; el super-admin exporta el gimnasio filtrado o todos.
+        if ($idGimnasio > 0) {
+            $query->where('clientes.id_gimnasio', $idGimnasio);
+        } elseif (! $esSuperAdmin) {
+            $query->whereRaw('1 = 0');
+        }
+
+        $items = $query
+            ->orderBy('clientes.paterno')
+            ->orderBy('clientes.nombres')
+            ->get();
+
+        $morososIds = DB::table('cuentas_corrientes')
+            ->whereIn('id_cliente', $items->pluck('id'))
+            ->whereNull('fecha_pago')
+            ->whereDate('fecha_vencimiento', '<', now()->toDateString())
+            ->pluck('id_cliente')
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        $rows = $items->map(fn($c) => collect([
+            (int) $c->id,
+            $c->nombres,
+            $c->paterno,
+            $c->materno,
+            $c->ci,
+            $c->email,
+            $c->telefono,
+            $c->gimnasio_nombre,
+            $c->plan_nombre,
+            (int) $c->estado === 1 ? 'Activo' : 'Inactivo',
+            in_array((int) $c->id, $morososIds, true) ? 'Sí' : 'No',
+            $c->fecha_ingreso,
+            $c->fecha_fin,
+        ]));
+
+        $binary = \Maatwebsite\Excel\Facades\Excel::raw(
+            new \App\Exports\ClientesExport($rows),
+            \Maatwebsite\Excel\Excel::XLSX
+        );
+
+        return response()->json([
+            'filename' => 'clientes_' . now()->format('Y-m-d') . '.xlsx',
+            'content_base64' => base64_encode($binary),
         ]);
     }
 

@@ -159,6 +159,7 @@ Route::prefix('app')->group(function () {
 
             // Clientes CRUD
             Route::get('/clientes',         [ApiAppController::class, 'adminClientesIndex']);
+            Route::get('/clientes/exportar', [ApiAppController::class, 'adminClientesExportar']);
             Route::get('/morosos',          [ApiAppController::class, 'adminMorososIndex']);
             Route::get('/motivos',          [ApiAppController::class, 'adminMotivosIndex']);
             Route::get('/generos',          [ApiAppController::class, 'adminGenerosIndex']);
